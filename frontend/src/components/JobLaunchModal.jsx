@@ -9,11 +9,12 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const AI_PRESETS = [
+  { label: 'Auto-Checkpointing (Resume)', prompt: 'Add cooperative checkpointing with CHECKPOINT_DIR so this workload survives host reclaims without progress loss' },
+  { label: 'Run Jupyter Notebook (.ipynb)', prompt: 'Configure headless Jupyter Notebook runner with nbconvert and CUDA isolation' },
   { label: 'PyTorch CUDA Benchmark', prompt: 'Matrix multiplication benchmark with CUDA TFLOPs calculation' },
-  { label: 'Train CNN (CIFAR-10)', prompt: 'Train a CNN model on GPU with synthetic batch tensors' },
+  { label: 'Train CNN (CIFAR-10 / MNIST)', prompt: 'Train a CNN model on GPU with synthetic batch tensors' },
   { label: 'Whisper Speech to Text', prompt: 'Setup OpenAI Whisper for GPU audio transcription' },
   { label: 'HuggingFace LLM Stack', prompt: 'Load HuggingFace transformer tokenizer and test GPU inference' },
-  { label: 'Stable Diffusion Latents', prompt: 'Test FP16 latent tensor pipeline for Stable Diffusion' },
 ];
 
 const SAMPLE_SCRIPTS = {
@@ -52,6 +53,116 @@ for epoch in range(1, 11):
 
 print("Training finished successfully on GPU!")
 `
+  },
+  checkpoint: {
+    name: 'train_with_checkpoint.py',
+    content: `import os
+import json
+import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+checkpoint_dir = os.environ.get("CHECKPOINT_DIR", "/workspace/checkpoints")
+os.makedirs(checkpoint_dir, exist_ok=True)
+resume = os.environ.get("RESUME_FROM_CHECKPOINT", "false").lower() == "true"
+start_step = int(os.environ.get("CHECKPOINT_STEP", "0"))
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"CUDA Available: {torch.cuda.is_available()} | Device: {device}")
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.fc = nn.Sequential(nn.Linear(128, 64), nn.ReLU(), nn.Linear(64, 10))
+    def forward(self, x):
+        return self.fc(x)
+
+model = Net().to(device)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+checkpoint_file = os.path.join(checkpoint_dir, "model_state.pt")
+
+if resume and os.path.exists(checkpoint_file):
+    print(f"Resuming workload from checkpoint at step {start_step}...")
+    ckpt = torch.load(checkpoint_file, map_location=device)
+    model.load_state_dict(ckpt["model"])
+    optimizer.load_state_dict(ckpt["optimizer"])
+    print("Checkpoint restored successfully!")
+
+total_steps = 25
+print(f"Starting training steps {start_step + 1} to {total_steps}...")
+
+for step in range(start_step + 1, total_steps + 1):
+    x = torch.randn(32, 128, device=device)
+    y = torch.randint(0, 10, (32,), device=device)
+    loss = nn.functional.cross_entropy(model(x), y)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+    print(f"Step {step:02d}/{total_steps} | Loss: {loss.item():.4f}")
+    time.sleep(0.4)
+
+    # Cooperative checkpoint snapshot (every 5 steps)
+    if step % 5 == 0 or step == total_steps:
+        torch.save({"step": step, "model": model.state_dict(), "optimizer": optimizer.state_dict()}, checkpoint_file)
+        with open(os.path.join(checkpoint_dir, "checkpoint.json"), "w") as f:
+            json.dump({"step": step, "totalSteps": total_steps}, f)
+        print(f"Saved snapshot {step}/{total_steps} to {checkpoint_dir}")
+
+print("Workload finished successfully with full checkpoint support!")
+`
+  },
+  notebook: {
+    name: 'quickstart_tensor.ipynb',
+    content: JSON.stringify({
+      cells: [
+        {
+          cell_type: "markdown",
+          metadata: {},
+          source: [
+            "# 🚀 IdleLab Quickstart Notebook\n",
+            "This Jupyter Notebook runs directly on the decentralized GPU grid.\n",
+            "Output cells, loss calculations, and CUDA execution metrics are automatically captured."
+          ]
+        },
+        {
+          cell_type: "code",
+          execution_count: null,
+          metadata: {},
+          outputs: [],
+          source: [
+            "import torch\n",
+            "import time\n",
+            "print('CUDA Available:', torch.cuda.is_available())\n",
+            "device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')\n",
+            "print('Active Device:', torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU')\n",
+            "\n",
+            "# Perform matrix multiplication benchmark\n",
+            "size = 4096\n",
+            "x = torch.randn(size, size, device=device)\n",
+            "y = torch.randn(size, size, device=device)\n",
+            "t0 = time.time()\n",
+            "z = torch.matmul(x, y)\n",
+            "if device.type == 'cuda': torch.cuda.synchronize()\n",
+            "print(f'Matrix multiplication ({size}x{size}) completed in {(time.time() - t0)*1000:.2f} ms')\n",
+            "print('Notebook executed successfully!')"
+          ]
+        }
+      ],
+      metadata: {
+        kernelspec: {
+          display_name: "Python 3",
+          language: "python",
+          name: "python3"
+        },
+        language_info: {
+          name: "python",
+          version: "3.10"
+        }
+      },
+      nbformat: 4,
+      nbformat_minor: 5
+    }, null, 2)
   },
   benchmark: {
     name: 'cuda_benchmark.py',
@@ -121,13 +232,13 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
   const handleFileChange = (e) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!/\.(py|sh)$/i.test(file.name)) {
-      setError('Only Python (.py) and shell (.sh) scripts can be uploaded.');
+    if (!/\.(py|sh|ipynb)$/i.test(file.name)) {
+      setError('Only Python (.py), shell (.sh), and Jupyter Notebook (.ipynb) files can be uploaded.');
       e.target.value = '';
       return;
     }
     if (file.size > 50 * 1024 * 1024) {
-      setError('Scripts must be 50 MB or smaller.');
+      setError('Files must be 50 MB or smaller.');
       e.target.value = '';
       return;
     }
@@ -141,9 +252,15 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
       setScriptContent(content);
 
       // Auto-set execution command
-      const cmd = file.name.toLowerCase().endsWith('.sh')
-        ? `bash /workspace/${file.name}` 
-        : `python /workspace/${file.name}`;
+      let cmd = '';
+      const lower = file.name.toLowerCase();
+      if (lower.endsWith('.sh')) {
+        cmd = `bash /workspace/${file.name}`;
+      } else if (lower.endsWith('.ipynb')) {
+        cmd = `(jupyter nbconvert --to notebook --execute /workspace/${file.name} --output /workspace/output_${file.name} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${file.name}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${file.name}'); print('=== Notebook executed successfully ===')")`;
+      } else {
+        cmd = `python /workspace/${file.name}`;
+      }
       setFormData(prev => ({ ...prev, command: cmd }));
     };
     reader.readAsText(file);
@@ -154,10 +271,17 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
     if (!sample) return;
     setScriptName(sample.name);
     setScriptContent(sample.content);
-    setFormData(prev => ({
-      ...prev,
-      command: `python /workspace/${sample.name}`
-    }));
+    if (sample.name.endsWith('.ipynb')) {
+      setFormData(prev => ({
+        ...prev,
+        command: `(jupyter nbconvert --to notebook --execute /workspace/${sample.name} --output /workspace/output_${sample.name} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${sample.name}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${sample.name}'); print('=== Notebook executed successfully ===')")`
+      }));
+    } else {
+      setFormData(prev => ({
+        ...prev,
+        command: `python /workspace/${sample.name}`
+      }));
+    }
   };
 
   const handleClearScript = () => {
@@ -179,6 +303,8 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
         gpuVram: gpu?.vram,
         currentCommand: formData.command,
         currentImage: formData.dockerImage,
+        scriptName: scriptName,
+        scriptContent: scriptContent,
       });
 
       setAiResult(resp.data);
@@ -198,6 +324,12 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
       command: aiResult.command || formData.command,
       vramRequired: aiResult.vramRequired !== undefined ? aiResult.vramRequired : formData.vramRequired,
     });
+    if (aiResult.suggestedScript) {
+      setScriptContent(aiResult.suggestedScript);
+      if (aiResult.suggestedScriptName) {
+        setScriptName(aiResult.suggestedScriptName);
+      }
+    }
     setAiApplied(true);
     setTimeout(() => {
       setShowAiAssistant(false);
@@ -208,22 +340,30 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
   const submitJob = async () => {
     let inputObjectKey = '';
     if (scriptName) {
-      const contentType = scriptName.toLowerCase().endsWith('.sh')
-        ? 'text/x-shellscript'
-        : 'text/x-python';
-      const scriptBlob = new Blob([scriptContent], { type: contentType });
-      const { data: upload } = await api.post('/jobs/uploads/presign', {
-        fileName: scriptName,
-        size: scriptBlob.size,
-      });
-      const uploadFormData = new FormData();
-      Object.entries(upload.fields).forEach(([key, value]) => uploadFormData.append(key, value));
-      uploadFormData.append('file', scriptBlob, scriptName);
-      const uploadResponse = await fetch(upload.url, { method: 'POST', body: uploadFormData });
-      if (!uploadResponse.ok) {
-        throw new Error('Could not upload script to object storage.');
+      try {
+        const lower = scriptName.toLowerCase();
+        const contentType = lower.endsWith('.sh')
+          ? 'text/x-shellscript'
+          : lower.endsWith('.ipynb')
+          ? 'application/x-ipynb+json'
+          : 'text/x-python';
+        const scriptBlob = new Blob([scriptContent], { type: contentType });
+        const { data: upload } = await api.post('/jobs/uploads/presign', {
+          fileName: scriptName,
+          size: scriptBlob.size,
+        });
+        if (upload && upload.storageAvailable !== false && upload.url && upload.fields) {
+          const uploadFormData = new FormData();
+          Object.entries(upload.fields).forEach(([key, value]) => uploadFormData.append(key, value));
+          uploadFormData.append('file', scriptBlob, scriptName);
+          const uploadResponse = await fetch(upload.url, { method: 'POST', body: uploadFormData });
+          if (uploadResponse.ok) {
+            inputObjectKey = upload.objectKey;
+          }
+        }
+      } catch (storageErr) {
+        console.warn('Object storage presign/upload not available, falling back to direct script payload:', storageErr);
       }
-      inputObjectKey = upload.objectKey;
     }
 
     const payload = {
@@ -231,6 +371,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
       vramRequired: parseFloat(formData.vramRequired),
       gpuId: gpu?._id,
       scriptName: scriptName || "",
+      scriptContent: scriptContent || "",
       inputObjectKey,
     };
     const resp = await api.post('/jobs', payload);
@@ -365,7 +506,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
             }`}
           >
             <UploadCloud size={14} />
-            Upload Script (.py / .sh)
+            Upload Script / Notebook (.py, .sh, .ipynb)
           </button>
           <button
             type="button"
@@ -420,7 +561,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
               <div className="flex gap-2">
                 <input
                   type="text"
-                  placeholder="Describe your workload..."
+                  placeholder="Describe your workload, ask for auto-checkpointing, or paste requirements..."
                   value={aiPrompt}
                   onChange={(e) => setAiPrompt(e.target.value)}
                   onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAskAi())}
@@ -441,22 +582,66 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
                 <div className="bg-black/60 rounded-xl p-4 border border-purple-500/20 flex flex-col gap-3 text-xs">
                   <div className="flex items-start justify-between">
                     <div>
-                      <p className="font-semibold text-purple-300 flex items-center gap-1.5">
-                        <Lightbulb size={14} /> AI Recommendation
-                      </p>
-                      <p className="text-[0.75rem] text-text-dim mt-0.5">{aiResult.explanation}</p>
+                      <div className="flex items-center gap-2">
+                        <p className="font-semibold text-purple-300 flex items-center gap-1.5">
+                          <Lightbulb size={14} /> AI Recommendation
+                        </p>
+                        {aiResult.checkpointSupported && (
+                          <span className="px-2 py-0.5 rounded text-[0.65rem] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/40">
+                            🛡️ Cooperative Checkpointing Active
+                          </span>
+                        )}
+                        <span className="px-1.5 py-0.5 rounded text-[0.6rem] bg-white/10 text-text-dim">
+                          {aiResult.source === 'llm' ? '🤖 Cloud LLM' : '⚡ Local AI Engine'}
+                        </span>
+                      </div>
+                      <p className="text-[0.75rem] text-text-dim mt-1">{aiResult.explanation}</p>
                     </div>
                   </div>
-                  <div className="flex justify-end pt-1">
-                    <button
-                      type="button"
-                      onClick={handleApplyAiSuggestion}
-                      disabled={aiApplied}
-                      className="px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-glow transition-all flex items-center gap-1.5"
-                    >
-                      {aiApplied ? <Check size={14} /> : <ArrowRight size={14} />}
-                      {aiApplied ? 'Applied!' : 'Apply AI Suggestion'}
-                    </button>
+
+                  {aiResult.optimizations && aiResult.optimizations.length > 0 && (
+                    <div className="flex flex-col gap-1 bg-white/[0.03] p-2.5 rounded-lg border border-white/5">
+                      <span className="text-[0.65rem] font-bold uppercase text-purple-300 tracking-wider">Hardware & Runtime Optimizations:</span>
+                      <ul className="list-disc list-inside text-[0.7rem] text-text-dim space-y-0.5">
+                        {aiResult.optimizations.map((opt, i) => (
+                          <li key={i}>{opt}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-white/5">
+                    <div className="flex items-center gap-3 text-[0.7rem] text-text-dim">
+                      <span>VRAM: <strong className="text-white">{aiResult.vramRequired || formData.vramRequired} GB</strong></span>
+                      <span>Image: <strong className="text-white font-mono text-[0.65rem]">{aiResult.dockerImage?.split(':')[0] || 'pytorch'}</strong></span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      {aiResult.suggestedScript && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setScriptContent(aiResult.suggestedScript);
+                            if (aiResult.suggestedScriptName) setScriptName(aiResult.suggestedScriptName);
+                            setTabMode('script');
+                            setAiApplied(true);
+                            setTimeout(() => setAiApplied(false), 1200);
+                          }}
+                          className="px-3 py-1.5 rounded-lg text-xs font-bold bg-emerald-600/30 hover:bg-emerald-600/50 text-emerald-300 border border-emerald-500/40 transition-all flex items-center gap-1.5"
+                        >
+                          <FileCode size={13} />
+                          Apply Code to Script Editor
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={handleApplyAiSuggestion}
+                        disabled={aiApplied}
+                        className="px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-glow transition-all flex items-center gap-1.5"
+                      >
+                        {aiApplied ? <Check size={14} /> : <ArrowRight size={14} />}
+                        {aiApplied ? 'Applied!' : 'Apply Configuration'}
+                      </button>
+                    </div>
                   </div>
                 </div>
               )}
@@ -469,24 +654,38 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
           {tabMode === 'script' ? (
             /* Script Upload Area */
             <div className="flex flex-col gap-3">
-              <div className="flex justify-between items-center">
+              <div className="flex flex-wrap justify-between items-center gap-2">
                 <label className="text-[0.75rem] font-bold uppercase text-text-dim flex items-center gap-2">
-                  <FileCode size={14} /> Upload Python / Shell Script
+                  <FileCode size={14} /> Upload Python / Shell / Notebook Script
                 </label>
-                <div className="flex gap-2">
+                <div className="flex flex-wrap gap-1.5">
                   <button
                     type="button"
                     onClick={() => handleLoadSample('mnist')}
                     className="text-[0.65rem] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary border border-primary/20 transition-all"
                   >
-                    Load train_mnist.py
+                    train_mnist.py
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSample('checkpoint')}
+                    className="text-[0.65rem] px-2 py-0.5 rounded bg-purple-500/10 hover:bg-purple-500/20 text-purple-300 border border-purple-500/30 transition-all font-semibold"
+                  >
+                    🛡️ Checkpoint Script
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSample('notebook')}
+                    className="text-[0.65rem] px-2 py-0.5 rounded bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 border border-amber-500/30 transition-all font-semibold"
+                  >
+                    📓 Jupyter Notebook (.ipynb)
                   </button>
                   <button
                     type="button"
                     onClick={() => handleLoadSample('benchmark')}
                     className="text-[0.65rem] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-accent border border-accent/20 transition-all"
                   >
-                    Load benchmark.py
+                    benchmark.py
                   </button>
                 </div>
               </div>
@@ -501,7 +700,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
                     type="file"
                     ref={fileInputRef}
                     onChange={handleFileChange}
-                    accept=".py,.sh"
+                    accept=".py,.sh,.ipynb"
                     className="hidden"
                   />
                   <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
@@ -509,7 +708,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
                   </div>
                   <div className="text-center">
                     <p className="text-sm font-bold text-white">Click to upload or drag & drop</p>
-                    <p className="text-xs text-text-dim">Supports .py, .sh, or custom compute scripts</p>
+                    <p className="text-xs text-text-dim">Supports .py, .sh, or .ipynb (Jupyter Notebooks)</p>
                   </div>
                 </div>
               ) : (

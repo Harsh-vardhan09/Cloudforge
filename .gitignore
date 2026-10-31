@@ -1,0 +1,30 @@
+# Dependencies
+node_modules/
+
+# Secrets — only the example template belongs in git
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+dist-ssr/
+
+# Runtime logs and debug artifacts
+logs/
+*.log
+out.log
+startup_error.txt
+db_check*.json
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+
+# Editor / OS
+.vscode/*
+!.vscode/extensions.json
+.idea/
+.DS_Store
