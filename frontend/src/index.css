@@ -1,15 +1,15 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #f4d63f;
-  --color-secondary: #eabf24;
-  --color-accent: #e87955;
-  --color-background: #f5f0e6;
+  --color-primary: #ff5a68;
+  --color-secondary: #39c6b3;
+  --color-accent: #f5a623;
+  --color-background: #fff4df;
   --color-surface: #fffdf7;
-  --color-surface-hover: #f4e9c9;
-  --color-text-dim: #625c50;
-  --color-success: #26734d;
-  --color-error: #c83d36;
+  --color-surface-hover: #ffe5b8;
+  --color-text-dim: #6b574c;
+  --color-success: #27865b;
+  --color-error: #d83a52;
 
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
@@ -126,7 +126,7 @@
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --primary: #d4ae00;
+  --primary: #e63c51;
   --border-subtle: #191919;
 }
 
@@ -161,7 +161,7 @@
 
   ::selection {
     color: #191919;
-    background: #f4d63f;
+    background: #ff5a68;
   }
 
   ::-webkit-scrollbar {
@@ -169,7 +169,7 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #f5f0e6;
+    background: #fff4df;
   }
 
   ::-webkit-scrollbar-thumb {
@@ -178,7 +178,7 @@
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #625c50;
+    background: #6b574c;
   }
 }
 
@@ -201,7 +201,7 @@
 
   .glow-btn:hover:not(:disabled) {
     transform: translate(-2px, -2px);
-    background: #ffe66d;
+    background: #ff7b83;
     box-shadow: 6px 6px 0 #191919;
   }
 
@@ -221,7 +221,7 @@
   }
 
   .subtle-btn:hover:not(:disabled) {
-    background: #f4e9c9;
+    background: #ffe5b8;
     border-color: #191919;
   }
 
@@ -739,7 +739,7 @@
 .app-shell,
 .login-shell {
   color: #191919;
-  background-color: #f5f0e6;
+  background-color: #fff4df;
 }
 
 .app-main {
@@ -791,7 +791,7 @@
 
 .app-shell .app-search-results button:hover,
 .app-shell .app-search-results button:focus-visible {
-  background: #f4e9c9;
+  background: #ffe5b8;
   color: #191919;
 }
 
@@ -802,7 +802,7 @@
 .app-shell .app-network-status > span:first-child {
   border: 1px solid #191919;
   border-radius: 0;
-  background: #7bbb54;
+  background: #39c6b3;
   box-shadow: 2px 2px 0 #191919;
 }
 
@@ -820,16 +820,16 @@
 
 .app-shell .text-primary,
 .login-shell .text-primary {
-  color: #806400 !important;
+  color: #c72e46 !important;
 }
 
 .app-shell [class*="bg-black"] .text-white,
 .app-shell [class*="bg-black"] [class*="text-white/"] {
-  color: #f5f0e6 !important;
+  color: #fff4df !important;
 }
 
 .app-shell [class*="bg-black"] .text-text-dim {
-  color: #c1b9a8 !important;
+  color: #d8c6b5 !important;
 }
 
 .app-shell .bg-primary.text-white,
@@ -855,24 +855,24 @@
 .login-shell .login-story > a > span:first-child {
   border: 2px solid #191919;
   border-radius: 4px;
-  background: #f4d63f;
+  background: #ff5a68;
   color: #191919;
   box-shadow: 3px 3px 0 #191919;
 }
 
 .app-shell .sidebar-nav-link {
   border-radius: 4px;
-  color: #625c50;
+  color: #6b574c;
 }
 
 .app-shell .sidebar-nav-link:hover {
-  background: #f4e9c9;
+  background: #ffe5b8;
   color: #191919;
 }
 
 .app-shell .sidebar-nav-link[class*="bg-primary/10"] {
   border: 1px solid #191919;
-  background: #f4d63f;
+  background: #ff5a68;
   color: #191919 !important;
   box-shadow: 3px 3px 0 #191919;
 }
@@ -894,13 +894,13 @@
 }
 
 .app-shell .app-icon-button:hover {
-  background: #f4e9c9 !important;
+  background: #ffe5b8 !important;
   color: #191919 !important;
 }
 
 .app-shell .app-icon-button > span {
   border: 1px solid #191919;
-  background: #f4d63f;
+  background: #ff5a68;
   color: #191919;
 }
 
@@ -910,7 +910,7 @@
 .login-shell button[class*="bg-primary"] {
   border: 2px solid #191919;
   border-radius: 4px;
-  background: #f4d63f;
+  background: #ff5a68;
   color: #191919 !important;
   box-shadow: 4px 4px 0 #191919;
 }
@@ -920,7 +920,7 @@
 .app-shell button[class*="bg-primary"]:hover:not(:disabled),
 .login-shell button[class*="bg-primary"]:hover:not(:disabled) {
   transform: translate(-2px, -2px);
-  background: #ffe66d;
+  background: #ff7b83;
   box-shadow: 6px 6px 0 #191919;
 }
 
@@ -935,7 +935,7 @@
 
 .app-shell .subtle-btn:hover:not(:disabled),
 .login-shell .subtle-btn:hover:not(:disabled) {
-  background: #f4e9c9;
+  background: #ffe5b8;
 }
 
 .app-shell input:not([type="radio"]):not([type="checkbox"]),
@@ -952,18 +952,18 @@
 .app-shell input::placeholder,
 .app-shell textarea::placeholder,
 .login-shell .login-input::placeholder {
-  color: #625c50;
+  color: #6b574c;
 }
 
 .app-shell .dashboard-hero {
   border-color: #191919;
-  background: #f4d63f;
+  background: #39c6b3;
   box-shadow: 7px 7px 0 #191919;
 }
 
 .app-shell .dashboard-hero .eyebrow,
 .login-shell .eyebrow {
-  color: #654f00;
+  color: #155e56;
 }
 
 .app-shell .dashboard-hero p,
@@ -1000,7 +1000,7 @@
 .app-shell select:focus,
 .app-shell textarea:focus {
   border-color: #191919;
-  outline: 3px solid #f4d63f;
+  outline: 3px solid #ff5a68;
   outline-offset: 2px;
 }
 
@@ -1011,4 +1011,81 @@
     background: #fffdf7;
     box-shadow: 4px 4px 0 #191919;
   }
+}
+
+.app-shell .text-text-dim,
+.login-shell .text-text-dim,
+.app-shell .app-search-wrap,
+.app-shell .app-network-status {
+  color: #6b574c !important;
+}
+
+.app-shell .app-search-wrap > svg {
+  color: #e63c51;
+}
+
+.app-shell .sidebar-nav-link:nth-child(4n + 1) svg {
+  color: #e63c51;
+}
+
+.app-shell .sidebar-nav-link:nth-child(4n + 2) svg {
+  color: #188d80;
+}
+
+.app-shell .sidebar-nav-link:nth-child(4n + 3) svg {
+  color: #c57908;
+}
+
+.app-shell .sidebar-nav-link:nth-child(4n) svg {
+  color: #7354bd;
+}
+
+.app-shell .sidebar-nav-link[class*="bg-primary/10"] svg {
+  color: #191919 !important;
+}
+
+.app-shell .dashboard-hero {
+  background: #39c6b3;
+}
+
+.app-shell .dashboard-hero .eyebrow {
+  color: #124e48;
+}
+
+.app-shell .dashboard-hero p {
+  color: #173d39;
+}
+
+.app-shell .stat-card:nth-child(5n + 1) > div:first-child > div:first-child {
+  border: 2px solid #191919;
+  background: #ffe0e4;
+  color: #c72e46;
+}
+
+.app-shell .stat-card:nth-child(5n + 2) > div:first-child > div:first-child {
+  border: 2px solid #191919;
+  background: #d5f4ed;
+  color: #16796e;
+}
+
+.app-shell .stat-card:nth-child(5n + 3) > div:first-child > div:first-child {
+  border: 2px solid #191919;
+  background: #ffedc2;
+  color: #a96800;
+}
+
+.app-shell .stat-card:nth-child(5n + 4) > div:first-child > div:first-child {
+  border: 2px solid #191919;
+  background: #e9e1ff;
+  color: #6848b0;
+}
+
+.app-shell .stat-card:nth-child(5n) > div:first-child > div:first-child {
+  border: 2px solid #191919;
+  background: #dceaff;
+  color: #315ca6;
+}
+
+.app-shell .app-page-heading {
+  border-color: #e63c51;
 }
