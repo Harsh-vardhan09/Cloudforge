@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
   Terminal, Shield, Cpu, Zap, Download, Copy, Check, DollarSign,
@@ -7,6 +7,8 @@ import {
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import { io } from 'socket.io-client';
+import TelemetryPanel from '../components/TelemetryPanel';
 
 const ReclaimModal = ({ job, gpu, onClose, onSuccess }) => {
   const navigate = useNavigate();
@@ -215,6 +217,29 @@ const Host = () => {
 
   // Reclaim Modal state
   const [showReclaimModal, setShowReclaimModal] = useState(false);
+
+  // Live socket for hardware telemetry
+  const socketRef = useRef(null);
+  const [socket, setSocket] = useState(null);
+
+  useEffect(() => {
+    if (!token) return;
+    const backendBase = import.meta.env.VITE_API_URL
+      ? import.meta.env.VITE_API_URL.replace('/api', '')
+      : 'http://localhost:5000';
+    const s = io(backendBase, {
+      auth: { token },
+      transports: ['websocket'],
+      reconnectionDelay: 2000,
+    });
+    socketRef.current = s;
+    setSocket(s);
+    return () => {
+      s.disconnect();
+      socketRef.current = null;
+      setSocket(null);
+    };
+  }, [token]);
 
   const fetchMyGpu = async () => {
     try {
@@ -518,6 +543,9 @@ const Host = () => {
           )}
         </div>
       </div>
+
+      {/* Hardware Telemetry Panel — streams live when a job is running */}
+      <TelemetryPanel socket={socket} activeJobId={activeJob?._id} />
 
       {/* Module 8: Reclaim Confirmation Modal */}
       <AnimatePresence>

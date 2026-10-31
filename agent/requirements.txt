@@ -5,3 +5,5 @@ requests==2.32.3
 docker==7.1.0
 psutil==6.0.0
 pydantic-settings==2.3.4
+# Optional — precise GPU telemetry (temp, power, fan via NVML). Falls back to nvidia-smi if absent.
+pynvml==11.5.0

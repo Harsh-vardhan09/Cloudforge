@@ -8,6 +8,7 @@ import {
   heartbeat,
   setOffline,
   updateSettings,
+  receiveTelemetry,
 } from "../controllers/gpu.controller.js";
 
 const gpurouter = express.Router();
@@ -32,5 +33,8 @@ gpurouter.patch("/heartbeat", authentication, heartbeat);
 
 // PATCH /api/gpu/offline — host marks GPU offline manually
 gpurouter.patch("/offline", authentication, setOffline);
+
+// POST /api/gpu/telemetry — agent streams live hardware telemetry while a job runs
+gpurouter.post("/telemetry", authentication, receiveTelemetry);
 
 export default gpurouter;

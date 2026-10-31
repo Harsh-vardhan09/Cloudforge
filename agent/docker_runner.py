@@ -17,6 +17,7 @@ import zipfile
 from typing import Optional
 
 from gpu_info import get_gpu_info
+from telemetry import TelemetryStreamer
 
 logger = logging.getLogger(__name__)
 
@@ -262,6 +263,7 @@ def run_docker_job(
     job_dir = None
     checkpoint_stop_event = threading.Event()
     checkpoint_thread = None
+    telemetry_streamer: TelemetryStreamer | None = None
     report_log = lambda line: push_log(backend_url, job_id, line, token, attempt)
     def report_complete(status, output_uploaded=False):
         if (
@@ -383,6 +385,19 @@ def run_docker_job(
 
         active_jobs[job_id] = container.id
         report_log(f"[agent] 🐳 Container started: {container.short_id}")
+
+        # ── Telemetry streaming ────────────────────────────────────────────
+        telemetry_interval = max(10, int(os.getenv("TELEMETRY_INTERVAL_SECONDS", "15")))
+        telemetry_streamer = TelemetryStreamer(
+            job_id=job_id,
+            backend_url=backend_url,
+            token=token,
+            interval=telemetry_interval,
+        )
+        telemetry_streamer.start()
+        report_log(f"[agent] 📡 Hardware telemetry streaming started (every {telemetry_interval}s)")
+        # ──────────────────────────────────────────────────────────────────
+
         if attempt is not None:
             checkpoint_interval = max(10, int(os.getenv("CHECKPOINT_INTERVAL_SECONDS", "60")))
 
@@ -505,6 +520,9 @@ def run_docker_job(
         report_complete("failed")
 
     finally:
+        # Stop telemetry streaming before cleanup
+        if telemetry_streamer is not None:
+            telemetry_streamer.stop()
         checkpoint_stop_event.set()
         if checkpoint_thread:
             checkpoint_thread.join(timeout=30)
