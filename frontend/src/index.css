@@ -1,20 +1,20 @@
 @import "tailwindcss";
 
 @theme {
-  --color-primary: #635bff;
-  --color-secondary: #5145cd;
-  --color-accent: #52678f;
-  --color-background: #f6f8fb;
-  --color-surface: #ffffff;
-  --color-surface-hover: #f2f5f9;
-  --color-text-dim: #64748b;
-  --color-success: #168a5b;
-  --color-error: #d14343;
+  --color-primary: #f4d63f;
+  --color-secondary: #eabf24;
+  --color-accent: #e87955;
+  --color-background: #f5f0e6;
+  --color-surface: #fffdf7;
+  --color-surface-hover: #f4e9c9;
+  --color-text-dim: #625c50;
+  --color-success: #26734d;
+  --color-error: #c83d36;
 
   --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "JetBrains Mono", monospace;
 
-  --shadow-glow: 0 4px 14px rgba(99, 91, 255, 0.18);
+  --shadow-glow: 4px 4px 0 #191919;
 }
 
 .app-icon-button {
@@ -126,8 +126,8 @@
   font-family: var(--font-sans);
   font-synthesis: none;
   text-rendering: optimizeLegibility;
-  --primary: #635bff;
-  --border-subtle: #e5eaf1;
+  --primary: #d4ae00;
+  --border-subtle: #191919;
 }
 
 @layer base {
@@ -139,7 +139,7 @@
     @apply min-h-screen bg-background antialiased;
     margin: 0;
     overflow-x: hidden;
-    color: #1f2937;
+    color: #191919;
     background-image: none;
   }
 
@@ -155,13 +155,13 @@
   button:focus-visible,
   a:focus-visible,
   input:focus-visible {
-    outline: 2px solid var(--color-primary);
+    outline: 3px solid #191919;
     outline-offset: 3px;
   }
 
   ::selection {
-    color: #ffffff;
-    background: #635bff;
+    color: #191919;
+    background: #f4d63f;
   }
 
   ::-webkit-scrollbar {
@@ -169,38 +169,40 @@
   }
 
   ::-webkit-scrollbar-track {
-    background: #f6f8fb;
+    background: #f5f0e6;
   }
 
   ::-webkit-scrollbar-thumb {
-    border-radius: 999px;
-    background: #cbd5e1;
+    border-radius: 0;
+    background: #191919;
   }
 
   ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8;
+    background: #625c50;
   }
 }
 
 @layer components {
   .glass-card {
-    border: 1px solid var(--border-subtle);
-    border-radius: 12px;
-    background: #ffffff;
-    box-shadow: 0 1px 2px rgba(16, 24, 40, 0.035);
+    border: 2px solid var(--border-subtle);
+    border-radius: 8px;
+    background: #fffdf7;
+    box-shadow: 5px 5px 0 #191919;
   }
 
   .glow-btn {
     @apply rounded-lg px-5 py-2.5 font-semibold transition-all duration-200 flex items-center justify-center gap-2;
     background: var(--color-primary);
-    color: #ffffff;
-    box-shadow: 0 2px 5px rgba(99, 91, 255, 0.18);
+    color: #191919;
+    border: 2px solid #191919;
+    border-radius: 4px;
+    box-shadow: 4px 4px 0 #191919;
   }
 
   .glow-btn:hover:not(:disabled) {
-    transform: translateY(-2px);
-    background: #5145cd;
-    box-shadow: 0 4px 10px rgba(99, 91, 255, 0.22);
+    transform: translate(-2px, -2px);
+    background: #ffe66d;
+    box-shadow: 6px 6px 0 #191919;
   }
 
   .glow-btn:disabled {
@@ -211,14 +213,16 @@
 
   .subtle-btn {
     @apply rounded-lg px-4 py-2 text-sm font-semibold transition-all duration-200 flex items-center gap-2 justify-center;
-    color: #344054;
-    background: #ffffff;
-    border: 1px solid #d0d7e2;
+    color: #191919;
+    background: #fffdf7;
+    border: 2px solid #191919;
+    border-radius: 4px;
+    box-shadow: 3px 3px 0 #191919;
   }
 
   .subtle-btn:hover:not(:disabled) {
-    background: #f8fafc;
-    border-color: #aeb9c8;
+    background: #f4e9c9;
+    border-color: #191919;
   }
 
   .subtle-btn:disabled {
@@ -231,12 +235,12 @@
     inset: 0;
     z-index: -1;
     pointer-events: none;
-    opacity: 0.12;
+    opacity: 0.16;
     background-image:
-      linear-gradient(rgba(53, 73, 103, 0.03) 1px, transparent 1px),
-      linear-gradient(90deg, rgba(53, 73, 103, 0.03) 1px, transparent 1px);
-    background-size: 56px 56px;
-    mask-image: linear-gradient(to bottom, black, transparent 88%);
+      linear-gradient(rgba(25, 25, 25, 0.12) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(25, 25, 25, 0.12) 1px, transparent 1px);
+    background-size: 32px 32px;
+    mask-image: linear-gradient(to bottom, black, transparent 96%);
   }
 
   .mesh-gradient {
@@ -729,5 +733,282 @@
     animation-duration: 0.01ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.01ms !important;
+  }
+}
+
+.app-shell,
+.login-shell {
+  color: #191919;
+  background-color: #f5f0e6;
+}
+
+.app-main {
+  background: transparent;
+}
+
+.app-shell .app-sidebar,
+.app-shell .glass-card,
+.login-shell .glass-card {
+  border: 2px solid #191919;
+  border-radius: 8px;
+  background-color: #fffdf7;
+  box-shadow: 5px 5px 0 #191919;
+}
+
+.app-shell .app-sidebar {
+  border-radius: 0;
+  border-right-width: 2px;
+  box-shadow: none;
+}
+
+.app-header {
+  border-bottom: 2px solid #191919;
+}
+
+.app-shell .app-header-title,
+.app-shell .dashboard-hero h2 {
+  color: #191919 !important;
+}
+
+.app-shell .app-search-wrap,
+.app-shell .app-search-results,
+.app-shell .app-search-results button {
+  border-color: #191919;
+  border-radius: 4px;
+  background: #fffdf7;
+  color: #191919;
+}
+
+.app-shell .app-search-wrap {
+  border-width: 2px;
+  box-shadow: 3px 3px 0 #191919;
+}
+
+.app-shell .app-search-wrap input,
+.app-shell .app-search-results strong {
+  color: #191919;
+}
+
+.app-shell .app-search-results button:hover,
+.app-shell .app-search-results button:focus-visible {
+  background: #f4e9c9;
+  color: #191919;
+}
+
+.app-shell .app-search-results button {
+  border-width: 0 0 1px;
+}
+
+.app-shell .app-network-status > span:first-child {
+  border: 1px solid #191919;
+  border-radius: 0;
+  background: #7bbb54;
+  box-shadow: 2px 2px 0 #191919;
+}
+
+.app-shell .app-network-status,
+.app-shell .app-credit-balance strong {
+  color: #191919;
+}
+
+.app-shell .text-white,
+.login-shell .text-white,
+.app-shell [class*="text-white/"],
+.login-shell [class*="text-white/"] {
+  color: #191919 !important;
+}
+
+.app-shell .text-primary,
+.login-shell .text-primary {
+  color: #806400 !important;
+}
+
+.app-shell [class*="bg-black"] .text-white,
+.app-shell [class*="bg-black"] [class*="text-white/"] {
+  color: #f5f0e6 !important;
+}
+
+.app-shell [class*="bg-black"] .text-text-dim {
+  color: #c1b9a8 !important;
+}
+
+.app-shell .bg-primary.text-white,
+.app-shell [class*="bg-primary/"].text-white,
+.login-shell .bg-primary.text-white,
+.login-shell [class*="bg-primary/"].text-white {
+  color: #191919 !important;
+}
+
+.app-shell [class*="bg-[#0d1117]"] {
+  border: 2px solid #191919;
+  border-radius: 6px;
+  background: #fffdf7;
+  box-shadow: 5px 5px 0 #191919;
+}
+
+.app-shell [class*="bg-[#0d1117]"] .text-white,
+.app-shell [class*="bg-[#0d1117]"] [class*="text-white/"] {
+  color: #191919 !important;
+}
+
+.app-shell .sidebar-brand-icon,
+.login-shell .login-story > a > span:first-child {
+  border: 2px solid #191919;
+  border-radius: 4px;
+  background: #f4d63f;
+  color: #191919;
+  box-shadow: 3px 3px 0 #191919;
+}
+
+.app-shell .sidebar-nav-link {
+  border-radius: 4px;
+  color: #625c50;
+}
+
+.app-shell .sidebar-nav-link:hover {
+  background: #f4e9c9;
+  color: #191919;
+}
+
+.app-shell .sidebar-nav-link[class*="bg-primary/10"] {
+  border: 1px solid #191919;
+  background: #f4d63f;
+  color: #191919 !important;
+  box-shadow: 3px 3px 0 #191919;
+}
+
+.app-shell .sidebar-nav-link[class*="bg-primary/10"] svg {
+  color: #191919 !important;
+}
+
+.app-shell .sidebar-nav-link .absolute {
+  display: none;
+}
+
+.app-shell .app-icon-button {
+  border: 2px solid #191919 !important;
+  border-radius: 4px !important;
+  background: #fffdf7 !important;
+  color: #191919 !important;
+  box-shadow: 3px 3px 0 #191919;
+}
+
+.app-shell .app-icon-button:hover {
+  background: #f4e9c9 !important;
+  color: #191919 !important;
+}
+
+.app-shell .app-icon-button > span {
+  border: 1px solid #191919;
+  background: #f4d63f;
+  color: #191919;
+}
+
+.app-shell .glow-btn,
+.login-shell .glow-btn,
+.app-shell button[class*="bg-primary"],
+.login-shell button[class*="bg-primary"] {
+  border: 2px solid #191919;
+  border-radius: 4px;
+  background: #f4d63f;
+  color: #191919 !important;
+  box-shadow: 4px 4px 0 #191919;
+}
+
+.app-shell .glow-btn:hover:not(:disabled),
+.login-shell .glow-btn:hover:not(:disabled),
+.app-shell button[class*="bg-primary"]:hover:not(:disabled),
+.login-shell button[class*="bg-primary"]:hover:not(:disabled) {
+  transform: translate(-2px, -2px);
+  background: #ffe66d;
+  box-shadow: 6px 6px 0 #191919;
+}
+
+.app-shell .subtle-btn,
+.login-shell .subtle-btn {
+  border: 2px solid #191919;
+  border-radius: 4px;
+  background: #fffdf7;
+  color: #191919;
+  box-shadow: 3px 3px 0 #191919;
+}
+
+.app-shell .subtle-btn:hover:not(:disabled),
+.login-shell .subtle-btn:hover:not(:disabled) {
+  background: #f4e9c9;
+}
+
+.app-shell input:not([type="radio"]):not([type="checkbox"]),
+.app-shell select,
+.app-shell textarea,
+.login-shell .login-input {
+  border: 2px solid #191919;
+  border-radius: 4px;
+  background-color: #fffdf7;
+  color: #191919;
+  box-shadow: 2px 2px 0 #191919;
+}
+
+.app-shell input::placeholder,
+.app-shell textarea::placeholder,
+.login-shell .login-input::placeholder {
+  color: #625c50;
+}
+
+.app-shell .dashboard-hero {
+  border-color: #191919;
+  background: #f4d63f;
+  box-shadow: 7px 7px 0 #191919;
+}
+
+.app-shell .dashboard-hero .eyebrow,
+.login-shell .eyebrow {
+  color: #654f00;
+}
+
+.app-shell .dashboard-hero p,
+.login-shell .login-story p {
+  color: #39352d;
+}
+
+.app-shell .dashboard-hero::after,
+.app-shell .stat-card::after {
+  border-color: rgba(25, 25, 25, 0.18);
+  border-radius: 0;
+  box-shadow: 0 0 0 35px rgba(25, 25, 25, 0.035), 0 0 0 75px rgba(25, 25, 25, 0.025);
+}
+
+.app-shell .stat-card {
+  border-width: 2px;
+  box-shadow: 4px 4px 0 #191919;
+}
+
+.login-shell .login-panel {
+  box-shadow: 7px 7px 0 #191919;
+}
+
+.login-shell [class*="border-white/"] {
+  border-color: #191919;
+}
+
+.login-shell [class*="bg-white/"] {
+  background-color: #f7f1e4;
+}
+
+.login-shell .login-input:focus,
+.app-shell input:focus,
+.app-shell select:focus,
+.app-shell textarea:focus {
+  border-color: #191919;
+  outline: 3px solid #f4d63f;
+  outline-offset: 2px;
+}
+
+@media (max-width: 760px) {
+  .app-shell .app-sidebar {
+    border: 2px solid #191919;
+    border-radius: 6px;
+    background: #fffdf7;
+    box-shadow: 4px 4px 0 #191919;
   }
 }
