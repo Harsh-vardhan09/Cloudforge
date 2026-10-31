@@ -23,6 +23,7 @@ import {
 const INPUT_CONTENT_TYPES = {
   ".py": "text/x-python",
   ".sh": "text/x-shellscript",
+  ".ipynb": "application/x-ipynb+json",
 };
 
 export const createInputUploadUrl = async (req, res, next) => {
@@ -40,7 +41,7 @@ export const createInputUploadUrl = async (req, res, next) => {
   const extension = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
   const contentType = INPUT_CONTENT_TYPES[extension];
   if (!contentType) {
-    return res.status(400).json({ message: "Only Python (.py) and shell (.sh) scripts are supported" });
+    return res.status(400).json({ message: "Only Python (.py), shell (.sh), and Jupyter Notebook (.ipynb) files are supported" });
   }
 
   try {
@@ -51,15 +52,21 @@ export const createInputUploadUrl = async (req, res, next) => {
       objectKey: key,
       contentType,
       expiresIn: STORAGE_URL_EXPIRY_SECONDS,
+      storageAvailable: true,
     });
   } catch (error) {
-    next(error);
+    logger.warn(`Presigned upload setup unavailable (${error.message}). Direct script content fallback enabled.`);
+    res.json({
+      storageAvailable: false,
+      directPayloadPreferred: true,
+      message: "Object storage is currently unconfigured; submit scriptContent directly in job payload.",
+    });
   }
 };
 
 import User from "../models/user.model.js";
 
-// POST /api/jobs — user submits a job or uploads a script
+// POST /api/jobs — user submits a job or uploads a script/notebook
 export const postJob = async (req, res, next) => {
   try {
     const user = await User.findById(req.user.id);
@@ -70,8 +77,8 @@ export const postJob = async (req, res, next) => {
     return next(err);
   }
 
-  const { dockerImage, command, vramRequired, env, gpuId, scriptName, inputObjectKey } = req.body;
-  const hasScript = Boolean(scriptName || inputObjectKey);
+  const { dockerImage, command, vramRequired, env, gpuId, scriptName, inputObjectKey, scriptContent } = req.body;
+  const hasScript = Boolean(scriptName || inputObjectKey || scriptContent);
 
   if (
     scriptName &&
@@ -80,14 +87,18 @@ export const postJob = async (req, res, next) => {
         scriptName.toLowerCase().endsWith(extension)
       ))
   ) {
-    return res.status(400).json({ message: "Only valid Python (.py) and shell (.sh) script names are supported" });
+    return res.status(400).json({ message: "Only valid Python (.py), shell (.sh), and Jupyter Notebook (.ipynb) files are supported" });
   }
 
-  // Derive default command if a script file was uploaded
+  // Derive default command if a script file or notebook was uploaded
   let finalCommand = command;
   if (!finalCommand && scriptName) {
-    if (scriptName.toLowerCase().endsWith(".sh")) {
+    const lowerName = scriptName.toLowerCase();
+    if (lowerName.endsWith(".sh")) {
       finalCommand = `bash /workspace/${scriptName}`;
+    } else if (lowerName.endsWith(".ipynb")) {
+      // Execute Jupyter Notebook with output preservation and pip fallback
+      finalCommand = `(jupyter nbconvert --to notebook --execute /workspace/${scriptName} --output /workspace/output_${scriptName} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${scriptName}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${scriptName}'); print('=== Notebook executed successfully ===')")`;
     } else {
       finalCommand = `python /workspace/${scriptName}`;
     }
@@ -101,8 +112,8 @@ export const postJob = async (req, res, next) => {
       message: "Either a script file or command is required",
     });
   }
-  if (hasScript && (!scriptName || !inputObjectKey)) {
-    return res.status(400).json({ message: "Upload the script before submitting the job" });
+  if (hasScript && !inputObjectKey && !scriptContent) {
+    return res.status(400).json({ message: "Upload the script or provide script content before submitting the job" });
   }
   if (
     inputObjectKey &&
@@ -129,6 +140,7 @@ export const postJob = async (req, res, next) => {
       vramRequired: finalVram,
       env: env || {},
       scriptName: scriptName || "",
+      scriptContent: scriptContent || "",
       inputObjectKey: inputObjectKey || "",
       status: "queued",
       logs: initialLogs,
@@ -298,19 +310,32 @@ export const claimJob = async (req, res, next) => {
       let legacyScriptContent = "";
       try {
         if (job.inputObjectKey) {
-          inputDownloadUrl = await createObjectDownloadUrl(
-            job.inputObjectKey,
-            job.scriptName || "input"
-          );
-        } else if (job.scriptName) {
+          try {
+            inputDownloadUrl = await createObjectDownloadUrl(
+              job.inputObjectKey,
+              job.scriptName || "input"
+            );
+          } catch (storageErr) {
+            logger.warn(`Could not prepare S3 download URL (${storageErr.message}); falling back to stored database script`);
+            const fallbackJob = await Job.findById(job._id).select("+scriptContent");
+            legacyScriptContent = fallbackJob?.scriptContent || "";
+          }
+        }
+        
+        if (!inputDownloadUrl && job.scriptName) {
           const legacyJob = await Job.findById(job._id).select("+scriptContent");
           legacyScriptContent = legacyJob?.scriptContent || "";
         }
+
         if (job.checkpointData?.objectKey) {
-          checkpointDownloadUrl = await createObjectDownloadUrl(
-            job.checkpointData.objectKey,
-            "checkpoint.zip"
-          );
+          try {
+            checkpointDownloadUrl = await createObjectDownloadUrl(
+              job.checkpointData.objectKey,
+              "checkpoint.zip"
+            );
+          } catch (storageErr) {
+            logger.warn(`Could not prepare checkpoint download URL: ${storageErr.message}`);
+          }
         }
       } catch (error) {
         await Job.updateOne(
@@ -375,6 +400,7 @@ export const claimJob = async (req, res, next) => {
           env: job.env instanceof Map ? Object.fromEntries(job.env) : job.env,
           scriptName: job.scriptName,
           legacyScriptContent,
+          scriptContent: legacyScriptContent,
         },
         inputDownloadUrl,
         checkpointDownloadUrl,
