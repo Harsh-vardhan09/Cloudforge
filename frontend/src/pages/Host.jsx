@@ -207,6 +207,7 @@ const Host = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
   const [myGpu, setMyGpu] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -365,10 +366,15 @@ const Host = () => {
             <div className="bg-surface-muted p-3 rounded-lg border border-ink/10 flex items-center gap-3">
               <code className="text-[0.7rem] text-text-dim truncate flex-1">{token || 'Login to see token'}</code>
               <button
-                 onClick={() => { navigator.clipboard.writeText(token); alert('Token copied!'); }}
-                 className="p-1.5 hover:bg-white/5 rounded text-text-dim"
+                onClick={() => {
+                  navigator.clipboard.writeText(token);
+                  setTokenCopied(true);
+                  setTimeout(() => setTokenCopied(false), 2000);
+                }}
+                className="p-1.5 hover:bg-white/5 rounded text-text-dim hover:text-white transition-colors"
+                title="Copy personal access token"
               >
-                 <Copy size={14} />
+                {tokenCopied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
               </button>
             </div>
           </div>
@@ -537,7 +543,8 @@ const Host = () => {
                 onClick={handleCopy}
                 className="text-xs font-bold text-primary hover:underline flex items-center gap-2"
               >
-                  <Download size={14} /> Download Agent Manual (.pdf)
+                  {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  {copied ? 'Setup script copied to clipboard!' : 'Copy Quick Setup script'}
               </button>
             </div>
           )}
