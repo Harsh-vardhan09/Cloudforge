@@ -3,7 +3,7 @@ import { logger } from "./utils/logger.js";
 
 const Dbconnect = async () => {
   try {
-    const mongoUri = process.env.MONGO_URI || "mongodb://localhost:27017/gpushare";
+    const mongoUri = "mongodb+srv://Aarsh-HV:8YimRbMLaPcPVXGZ@cluster-0.8gncwre.mongodb.net/";
     const connect = await mongoose.connect(mongoUri);
     if (connect) {
       logger.info(`💾 MongoDB connected: ${connect.connection.host}`);
