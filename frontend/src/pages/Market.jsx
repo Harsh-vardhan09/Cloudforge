@@ -154,7 +154,7 @@ const Market = () => {
   const showShowcaseGpus = statusFilter === 'all' || statusFilter === 'available';
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="page-market flex flex-col gap-6">
       <section className="glass-card relative overflow-hidden p-5 sm:p-7">
         <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-primary/10 shadow-[0_0_0_32px_rgba(197,243,106,0.025),0_0_0_68px_rgba(197,243,106,0.02)]" />
         <div className="relative z-[1] flex flex-col gap-5">

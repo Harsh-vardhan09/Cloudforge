@@ -1105,3 +1105,231 @@
 .login-shell [class*="border-white/"] {
   border-color: rgba(64, 52, 61, 0.18) !important;
 }
+
+.page-dashboard .dashboard-hero {
+  background: linear-gradient(118deg, #d5f4ed 0%, #dceaff 54%, #ffedc2 100%);
+  box-shadow: 7px 7px 0 #40343d;
+}
+
+.page-dashboard .stat-card:nth-child(5n + 1) {
+  background: linear-gradient(145deg, #fffdf8 35%, #ffe0e4);
+}
+
+.page-dashboard .stat-card:nth-child(5n + 2) {
+  background: linear-gradient(145deg, #fffdf8 35%, #d5f4ed);
+}
+
+.page-dashboard .stat-card:nth-child(5n + 3) {
+  background: linear-gradient(145deg, #fffdf8 35%, #ffedc2);
+}
+
+.page-dashboard .stat-card:nth-child(5n + 4) {
+  background: linear-gradient(145deg, #fffdf8 35%, #e9e1ff);
+}
+
+.page-dashboard .stat-card:nth-child(5n) {
+  background: linear-gradient(145deg, #fffdf8 35%, #dceaff);
+}
+
+.page-dashboard > section:last-child > .glass-card {
+  background: linear-gradient(145deg, #fffdf8 55%, #f4e9dc);
+}
+
+.page-market > section:first-child {
+  border-color: #40343d;
+  background: linear-gradient(120deg, #d5f4ed 0%, #fffdf8 52%, #ffedc2 100%);
+  box-shadow: 6px 6px 0 #40343d;
+}
+
+.page-market section > div[class*="grid"] > .glass-card:nth-child(4n + 1) {
+  background: linear-gradient(150deg, #fffdf8 55%, #ffe0e4);
+}
+
+.page-market section > div[class*="grid"] > .glass-card:nth-child(4n + 2) {
+  background: linear-gradient(150deg, #fffdf8 55%, #d5f4ed);
+}
+
+.page-market section > div[class*="grid"] > .glass-card:nth-child(4n + 3) {
+  background: linear-gradient(150deg, #fffdf8 55%, #ffedc2);
+}
+
+.page-market section > div[class*="grid"] > .glass-card:nth-child(4n) {
+  background: linear-gradient(150deg, #fffdf8 55%, #e9e1ff);
+}
+
+.page-market .glass-card:hover {
+  border-color: #40343d;
+  box-shadow: 6px 6px 0 #40343d;
+}
+
+.page-jobs > section:first-child {
+  border-color: #40343d;
+  background: linear-gradient(120deg, #e9e1ff 0%, #dceaff 48%, #d5f4ed 100%);
+  box-shadow: 6px 6px 0 #40343d;
+}
+
+.page-jobs > section:first-child > div:last-child > div:nth-child(3n + 1) {
+  border-color: rgba(64, 52, 61, 0.28);
+  background: #d5f4ed;
+}
+
+.page-jobs > section:first-child > div:last-child > div:nth-child(3n + 2) {
+  border-color: rgba(64, 52, 61, 0.28);
+  background: #ffedc2;
+}
+
+.page-jobs > section:first-child > div:last-child > div:nth-child(3n) {
+  border-color: rgba(64, 52, 61, 0.28);
+  background: #ffe0e4;
+}
+
+.page-jobs > .glass-card > div:first-child {
+  background: linear-gradient(90deg, #d5f4ed, #e9e1ff, #ffedc2);
+}
+
+.page-jobs tbody tr:hover {
+  background: #f4e9dc;
+}
+
+.page-migration > header {
+  border-color: #40343d;
+  background: linear-gradient(120deg, #d5f4ed 0%, #fffdf8 48%, #e9e1ff 100%);
+  box-shadow: 7px 7px 0 #40343d;
+}
+
+.page-migration > header > div > div.grid > div:nth-child(4n + 1) {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: #d5f4ed;
+}
+
+.page-migration > header > div > div.grid > div:nth-child(4n + 2) {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: #ffe0e4;
+}
+
+.page-migration > header > div > div.grid > div:nth-child(4n + 3) {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: #ffedc2;
+}
+
+.page-migration > header > div > div.grid > div:nth-child(4n) {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: #e9e1ff;
+}
+
+.page-migration > section:last-child > div:nth-child(3n + 1) {
+  background: linear-gradient(145deg, #fffdf8 35%, #ffedc2);
+}
+
+.page-migration > section:last-child > div:nth-child(3n + 2) {
+  background: linear-gradient(145deg, #fffdf8 35%, #dceaff);
+}
+
+.page-migration > section:last-child > div:nth-child(3n) {
+  background: linear-gradient(145deg, #fffdf8 35%, #d5f4ed);
+}
+
+.page-billing > div:first-child > .glass-card:first-child {
+  border-color: #40343d;
+  background: linear-gradient(145deg, #d5f4ed 0%, #fffdf8 52%, #ffedc2 100%);
+  box-shadow: 7px 7px 0 #40343d;
+}
+
+.page-billing > div:first-child > .grid > .glass-card:first-child {
+  background: linear-gradient(140deg, #fffdf8 30%, #ffe0e4);
+}
+
+.page-billing > div:first-child > .grid > .glass-card:last-child {
+  background: linear-gradient(140deg, #fffdf8 30%, #e9e1ff);
+}
+
+.page-billing > .glass-card {
+  background: linear-gradient(145deg, #fffdf8 65%, #dceaff);
+}
+
+.page-billing > .glass-card > div:last-child > div {
+  border-color: rgba(64, 52, 61, 0.12);
+  background: linear-gradient(100deg, #fffdf8, #f4e9dc);
+}
+
+.page-api-market > header {
+  align-items: flex-start;
+  padding: 22px;
+  border: 2px solid #40343d;
+  border-radius: 8px;
+  background: linear-gradient(120deg, #ffe0e4 0%, #fffdf8 48%, #d5f4ed 100%);
+  box-shadow: 6px 6px 0 #40343d;
+}
+
+.page-api-market > header > div > div:last-child {
+  border-color: rgba(64, 52, 61, 0.3);
+  background: rgba(255, 253, 248, 0.8);
+}
+
+.page-api-market .grid > .glass-card:nth-child(4n + 1) {
+  background: linear-gradient(150deg, #fffdf8 58%, #ffe0e4);
+}
+
+.page-api-market .grid > .glass-card:nth-child(4n + 2) {
+  background: linear-gradient(150deg, #fffdf8 58%, #d5f4ed);
+}
+
+.page-api-market .grid > .glass-card:nth-child(4n + 3) {
+  background: linear-gradient(150deg, #fffdf8 58%, #ffedc2);
+}
+
+.page-api-market .grid > .glass-card:nth-child(4n) {
+  background: linear-gradient(150deg, #fffdf8 58%, #e9e1ff);
+}
+
+.page-api-playground > header {
+  border: 2px solid #40343d;
+  border-radius: 8px;
+  background: linear-gradient(110deg, #ffe0e4, #fffdf8 48%, #d5f4ed);
+  box-shadow: 4px 4px 0 #40343d;
+}
+
+.page-api-playground > main {
+  border-color: #40343d;
+  background: linear-gradient(160deg, #fffdf8 50%, #e9e1ff 100%);
+}
+
+.page-api-playground > main [class*="bg-primary/20"][class*="rounded-tr-none"] {
+  border-color: #40343d;
+  background: #ffe0e4;
+  color: #40343d;
+}
+
+.page-api-playground > main [class*="bg-white/5"][class*="rounded-tl-none"] {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: #d5f4ed;
+  color: #40343d;
+}
+
+.login-shell {
+  background:
+    radial-gradient(ellipse at 8% 12%, rgba(213, 244, 237, 0.95), transparent 34%),
+    radial-gradient(ellipse at 92% 84%, rgba(255, 224, 228, 0.78), transparent 32%),
+    #f8f1e7;
+}
+
+.login-shell .login-panel {
+  background: linear-gradient(145deg, #fffdf8 65%, #e9e1ff);
+}
+
+.login-shell .login-story > div.max-w-2xl > div.grid > div:first-child {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: linear-gradient(145deg, #fffdf8, #d5f4ed);
+}
+
+.login-shell .login-story > div.max-w-2xl > div.grid > div:last-child {
+  border-color: rgba(64, 52, 61, 0.25);
+  background: linear-gradient(145deg, #fffdf8, #ffedc2);
+}
+
+@media (max-width: 640px) {
+  .page-api-market > header {
+    flex-direction: column;
+    gap: 18px;
+  }
+}

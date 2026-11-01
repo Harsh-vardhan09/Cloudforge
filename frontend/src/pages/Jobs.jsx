@@ -331,7 +331,7 @@ const Jobs = () => {
   }
 
   return (
-    <div className="flex flex-col gap-5">
+    <div className="page-jobs flex flex-col gap-5">
       <section className="glass-card relative overflow-hidden p-5 sm:p-6">
         <div className="pointer-events-none absolute -right-12 -top-24 h-64 w-64 rounded-full border border-primary/10 shadow-[0_0_0_34px_rgba(197,243,106,0.025)]" />
         <div className="relative z-[1] flex flex-wrap items-end justify-between gap-4">

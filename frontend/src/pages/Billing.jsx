@@ -90,7 +90,7 @@ const Billing = () => {
   }
 
   return (
-    <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.5fr)]">
+    <div className="page-billing grid grid-cols-1 items-start gap-5 xl:grid-cols-[minmax(280px,0.78fr)_minmax(0,1.5fr)]">
       <div className="flex flex-col gap-4">
         <Motion.div
           whileHover={{ y: -3 }}
