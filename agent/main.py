@@ -13,6 +13,7 @@ import hmac
 import logging
 import os
 import signal
+import socket
 import threading
 import time
 import requests
@@ -252,6 +253,39 @@ app = FastAPI(
 # server-side and no browser code talks to it, so there is no origin to allow.
 
 
+def bind_agent_socket() -> socket.socket:
+    """Bind the configured port, falling back through the agent's local port range."""
+    fallback_ports = range(7000, 7101)
+    preferred_port = settings.agent_port
+    candidates = [preferred_port] if 1024 <= preferred_port <= 65535 else []
+    candidates.extend(port for port in fallback_ports if port != preferred_port)
+    last_error = None
+
+    for port in candidates:
+        server_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        try:
+            server_socket.bind(("0.0.0.0", port))
+            server_socket.listen(2048)
+            server_socket.setblocking(False)
+        except OSError as error:
+            last_error = error
+            server_socket.close()
+            continue
+
+        if port != preferred_port:
+            logger.warning(
+                "Configured agent port %s is unavailable; using port %s instead",
+                preferred_port,
+                port,
+            )
+        settings.agent_port = port
+        return server_socket
+
+    raise OSError(
+        f"Could not bind the GPU agent to ports {preferred_port} or 7000-7100"
+    ) from last_error
+
+
 # ---------------------------------------------------------------------------
 # Authentication
 # ---------------------------------------------------------------------------
@@ -402,10 +436,16 @@ async def metrics():
 # Entry point
 # ---------------------------------------------------------------------------
 if __name__ == "__main__":
-    uvicorn.run(
-        "main:app",
-        host="0.0.0.0",
-        port=settings.agent_port,
-        reload=False,
-        log_level="info",
-    )
+    server_socket = bind_agent_socket()
+    try:
+        config = uvicorn.Config(
+            "main:app",
+            host="0.0.0.0",
+            port=settings.agent_port,
+            reload=False,
+            log_level="info",
+        )
+        server = uvicorn.Server(config)
+        asyncio.run(server.serve(sockets=[server_socket]))
+    finally:
+        server_socket.close()

@@ -4,7 +4,7 @@ from zipfile import ZIP_DEFLATED, ZipFile
 
 ROOT = Path(__file__).resolve().parents[1]
 AGENT_DIR = ROOT / "agent"
-OUTPUT = ROOT / "frontend" / "public" / "downloads" / "computegrid-gpu-agent-windows-v4.zip"
+OUTPUT = ROOT / "frontend" / "public" / "downloads" / "computegrid-gpu-agent-windows-v5.zip"
 EXCLUDED_DIRS = {".git", ".venv", "__pycache__"}
 EXCLUDED_FILES = {".env"}
 

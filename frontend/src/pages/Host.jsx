@@ -333,8 +333,8 @@ const Host = () => {
                 ))}
               </div>
               <a
-                href="/downloads/computegrid-gpu-agent-windows-v4.zip"
-                download="computegrid-gpu-agent-windows-v4.zip"
+                href="/downloads/computegrid-gpu-agent-windows-v5.zip"
+                download="computegrid-gpu-agent-windows-v5.zip"
                 className="inline-flex items-center gap-2 rounded-xl border-2 border-ink bg-primary px-4 py-2.5 text-sm font-bold text-text shadow-[3px_3px_0_#40343d] transition-all hover:-translate-y-0.5 hover:bg-accent hover:shadow-[4px_4px_0_#40343d]"
               >
                 <Download size={16} />
