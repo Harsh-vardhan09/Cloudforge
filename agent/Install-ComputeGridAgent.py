@@ -1,5 +1,3 @@
-import getpass
-import os
 import re
 import shutil
 import subprocess
@@ -47,7 +45,10 @@ def main() -> None:
     if parsed_url.scheme not in {"http", "https"} or not parsed_url.netloc:
         fail("Enter a valid backend URL beginning with http:// or https://.")
 
-    token = getpass.getpass("Paste the host token from the Add GPU page: ").strip()
+    token = input(
+        "Paste the host token from the Add GPU page "
+        "(input will be visible in this window): "
+    ).strip()
     if not token:
         fail("A host token is required. Get one from the Add GPU page and rerun Install.bat.")
     if re.search(r"[\r\n]", token):

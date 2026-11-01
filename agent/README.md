@@ -23,8 +23,9 @@ offered jobs whose VRAM requirement fits what it advertises.
 On the website, open **Add GPU** and download the Windows agent package. Extract
 the ZIP, then double-click `Install.bat`. It checks for Python and Docker,
 installs the agent dependencies, and prompts for your backend URL and host token.
-The token is saved in `agent/.env` on your PC; do not share that file. The
-installer uses Python directly and does not require PowerShell.
+The host token is visible in the installer window while you paste it, then saved
+in `agent/.env` on your PC; keep that file private. The installer uses Python
+directly and does not require PowerShell.
 
 The installer requires Python 3.11–3.13 and Docker Desktop to be installed and
 running. GPU acceleration additionally requires an NVIDIA driver and working
@@ -141,5 +142,5 @@ Allow that port from the backend's address. Everything else works without it.
 ## Packaging the Windows download
 
 From the repository root, run `python agent/package_windows.py` to regenerate
-`frontend/public/downloads/computegrid-gpu-agent-windows-v3.zip` after changing
+`frontend/public/downloads/computegrid-gpu-agent-windows-v4.zip` after changing
 the agent or installer.

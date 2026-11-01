@@ -309,11 +309,11 @@ const Host = () => {
             <p className="mb-4 text-sm leading-relaxed text-text-dim">
               Download the agent package—no Git or repository clone needed. Extract the ZIP, then double-click
               <code className="mx-1 rounded bg-surface-muted px-1.5 py-0.5 text-text">Install.bat</code>.
-              The installer sets up Python dependencies and securely prompts for your host token.
+              The installer sets up Python dependencies and prompts you to paste your host token.
             </p>
             <a
-              href="/downloads/computegrid-gpu-agent-windows-v3.zip"
-              download="computegrid-gpu-agent-windows-v3.zip"
+              href="/downloads/computegrid-gpu-agent-windows-v4.zip"
+              download="computegrid-gpu-agent-windows-v4.zip"
               className="inline-flex items-center gap-2 rounded-xl border-2 border-ink bg-primary px-4 py-2.5 text-sm font-bold text-text shadow-[3px_3px_0_#40343d] transition-transform hover:-translate-y-0.5"
             >
               <Download size={16} />
@@ -323,7 +323,7 @@ const Host = () => {
               Requires Python 3.11–3.13 and Docker Desktop. The installer will use backend
               <code className="mx-1 rounded bg-surface-muted px-1.5 py-0.5 text-text">{backendUrl}</code>;
               if your backend is elsewhere, enter its URL when prompted.
-              Keep the installer window open; it displays setup progress and any errors.
+              Keep the installer window open; the token is visible while pasting it.
             </p>
           </div>
 
