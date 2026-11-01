@@ -113,6 +113,10 @@ def send_heartbeat(paused: bool = False) -> None:
                 logger.info("Heartbeat recovered; this GPU is online again")
                 _last_heartbeat_problem = None
             return
+        if resp.status_code == 404:
+            logger.info("GPU record not found on backend. Attempting re-registration...")
+            register_gpu()
+            return
         problem = f"status {resp.status_code}"
         if resp.status_code == 401:
             problem = "token rejected (401) - set a fresh AGENT_JWT_TOKEN and restart"
