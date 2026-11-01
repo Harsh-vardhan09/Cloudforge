@@ -81,11 +81,16 @@ function generateJobAssistantLocal({
 
   // 1. Cooperative Checkpointing Injection / Interruption-proof
   if (
-    p.includes("checkpoint") ||
-    p.includes("resume") ||
-    p.includes("interrupt") ||
-    p.includes("preempt") ||
-    (scriptContent && (p.includes("save") || p.includes("persist") || p.includes("resilience")))
+    !scriptContent &&
+    (
+      p.includes("checkpoint") ||
+      p.includes("resume") ||
+      p.includes("interrupt") ||
+      p.includes("preempt") ||
+      p.includes("save") ||
+      p.includes("persist") ||
+      p.includes("resilience")
+    )
   ) {
     const checkpointScript = `import os
 import json
@@ -206,38 +211,35 @@ print("==> Workload successfully finished with full cooperative checkpoint suppo
   // 3. User Provided Script Analysis & Enhancement
   if (scriptContent && scriptContent.trim().length > 0) {
     const hasCudaCheck = scriptContent.includes("cuda.is_available");
-    const hasCheckpoints = scriptContent.includes("CHECKPOINT_DIR");
-    let enhanced = scriptContent;
-
-    if (!hasCheckpoints && scriptContent.includes("torch")) {
-      enhanced = `# [IdleLab Auto-Checkpointing Hook Injected]
-import os, json
-_ckpt_dir = os.environ.get("CHECKPOINT_DIR", "/workspace/checkpoints")
-os.makedirs(_ckpt_dir, exist_ok=True)
-_resume = os.environ.get("RESUME_FROM_CHECKPOINT", "false").lower() == "true"
-_step = int(os.environ.get("CHECKPOINT_STEP", "0"))
-if _resume:
-    print(f"[IdleLab] Resuming workload from step {_step}...")
-
-` + scriptContent;
-    }
+    const hasCheckpointWrites =
+      scriptContent.includes("CHECKPOINT_DIR") &&
+      (scriptContent.includes("torch.save") || scriptContent.includes("save_pretrained"));
+    const hasCheckpointResume =
+      scriptContent.includes("RESUME_FROM_CHECKPOINT") &&
+      (scriptContent.includes("torch.load") || scriptContent.includes("from_pretrained"));
+    const hasCheckpoints = hasCheckpointWrites && hasCheckpointResume;
 
     return {
       dockerImage: currentImage || "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
       command: currentCommand || `python /workspace/${scriptName || "script.py"}`,
       vramRequired: Math.min(vram, 6),
-      checkpointSupported: hasCheckpoints || scriptContent.includes("torch"),
+      batchSize: vram >= 16 ? 64 : vram >= 8 ? 32 : 8,
+      checkpointSupported: hasCheckpoints,
+      checkpointPlan: hasCheckpoints
+        ? "The script saves and restores model state under CHECKPOINT_DIR."
+        : "This script does not implement both checkpoint saving and restore. The local rules engine cannot safely rewrite an arbitrary training loop.",
       suggestedScriptName: scriptName || "script.py",
-      suggestedScript: enhanced,
-      explanation: `Analyzed uploaded script '${scriptName || "script.py"}'. ${hasCudaCheck ? "Verified CUDA device selection." : "Added CUDA device verification check."} ${hasCheckpoints ? "Cooperative checkpointing verified." : "Injected cooperative checkpointing headers to support host reclaim migration without loss."}`,
+      ...(hasCheckpoints ? { suggestedScript: scriptContent } : {}),
+      explanation: `Analyzed uploaded script '${scriptName || "script.py"}'. ${hasCudaCheck ? "Found a CUDA availability check." : "Could not confirm a CUDA availability check."} ${hasCheckpoints ? "Checkpoint save and restore logic was found." : "Review the checkpoint limitation before submitting."}`,
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
         CUDA_VISIBLE_DEVICES: "0",
+        BATCH_SIZE: String(vram >= 16 ? 64 : vram >= 8 ? 32 : 8),
       },
       optimizations: [
-        hasCudaCheck ? "CUDA device binding confirmed" : "Verify torch.cuda.is_available() on container initialization",
-        "Batch sizing aligned with available GPU VRAM",
-        "Cooperative checkpointing enabled for migration resilience",
+        hasCudaCheck ? "CUDA availability check found in the script" : "Verify torch.cuda.is_available() when the container starts",
+        "Suggested batch size is provided as BATCH_SIZE; the script must read it to change training batches",
+        hasCheckpoints ? "Script saves and restores checkpoints" : "Add model and optimizer save/restore calls to make this script resumable",
       ],
     };
   }
@@ -290,7 +292,9 @@ for step in range(1, 11):
 print('==> Training completed successfully on GPU!')
 "`,
       vramRequired: Math.min(vram, 4),
-      checkpointSupported: true,
+      batchSize: 64,
+      checkpointSupported: false,
+      checkpointPlan: "No checkpoint save and restore code is included in this generated benchmark.",
       explanation: "Generated a robust PyTorch CNN training pipeline running directly on CUDA with automated batch latency measurements and synthetic GPU memory utilization.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -322,7 +326,9 @@ print(f'==> Whisper model loaded on {device}. Model parameter count: {sum(p.nume
 print('==> Audio pipeline ready for batch inference!')
 "`,
       vramRequired: Math.min(vram, 6),
+      batchSize: vram >= 16 ? 64 : vram >= 8 ? 32 : 8,
       checkpointSupported: false,
+      checkpointPlan: "This workload does not include model checkpoint save and restore code.",
       explanation: "Configured OpenAI Whisper environment with automatic pip installation and base model initialization directly onto GPU memory.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -609,14 +615,30 @@ function analyzeFailureLocal(logs = [], command = "", dockerImage = "", exitCode
 
 /**
  * POST /api/ai/assistant
- * Input: { prompt, gpuModel, gpuVram, currentCommand, currentImage, scriptName, scriptContent }
+ * Input: { prompt, gpuModel, gpuVram, currentCommand, currentImage, scriptName, scriptContent, datasetName }
  */
 export const aiJobAssistant = async (req, res, next) => {
   try {
-    const { prompt, gpuModel, gpuVram, currentCommand, currentImage, scriptName, scriptContent } = req.body;
+    const {
+      prompt,
+      gpuModel,
+      gpuVram,
+      currentCommand,
+      currentImage,
+      scriptName,
+      scriptContent,
+      datasetName,
+    } = req.body;
 
-    if (!prompt && !currentCommand && !scriptContent) {
-      return res.status(400).json({ message: "Either a prompt, command, or script is required" });
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ message: "Describe the workload you want to run" });
+    }
+    if (
+      datasetName &&
+      (typeof datasetName !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(datasetName))
+    ) {
+      return res.status(400).json({ message: "Provide a valid dataset filename" });
     }
 
     // Try calling external LLM first if configured
@@ -625,12 +647,14 @@ Given a user's task description, script content (if provided), and target GPU sp
 - dockerImage: Recommended Docker image (e.g. pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime, tensorflow/tensorflow:latest-gpu, etc.)
 - command: Complete, runnable bash or python command that executes the task with CUDA validation
 - vramRequired: Recommended VRAM in GB (float/int)
+- batchSize: Conservative recommended integer batch size for this GPU
+- checkpointPlan: Explain whether the returned script actually saves and restores model/optimizer state under CHECKPOINT_DIR
 - explanation: Clear rationale for image, memory, runtime flags, and checkpointing strategy
 - suggestedEnv: Object containing recommended environment variables (e.g. PYTHONUNBUFFERED: "1", CUDA_VISIBLE_DEVICES: "0")
 - optimizations: Array of 3 key tips to ensure the script runs reliably on this GPU
-- suggestedScript: (optional) Updated or generated Python script code with cooperative checkpointing (CHECKPOINT_DIR) if user asked for a script or checkpointing
+- suggestedScript: (optional) Updated or generated runnable Python script. For an uploaded script, preserve its behavior and integrate checkpoint saving AND loading instead of only adding headers
 - suggestedScriptName: (optional) filename for suggestedScript (e.g. train_checkpoint.py)
-- checkpointSupported: boolean true if cooperative checkpointing is enabled in the workload.`;
+- checkpointSupported: boolean true only if the returned script actually saves and restores workload state.`;
 
     const userPrompt = `Target GPU: ${gpuModel || "NVIDIA GPU"} with ${gpuVram || 8} GB VRAM.
 User Goal / Task: ${prompt || "Analyze and optimize current workload"}
@@ -638,14 +662,63 @@ Current Command: ${currentCommand || "None"}
 Current Docker Image: ${currentImage || "None"}
 Script Name: ${scriptName || "None"}
 Script Content Preview: ${scriptContent ? scriptContent.slice(0, 2000) : "None"}
+Dataset File: ${datasetName || "None"}${datasetName ? ` (available at /workspace/data/${datasetName})` : ""}
+When a dataset is attached, use that file rather than synthetic data. If its schema is unknown, state the assumptions and do not claim the generated workload trains on it unless the script actually reads it.
 
 Return pure JSON matching the schema.`;
 
     const llmResult = await callLLMIfAvailable(systemPrompt, userPrompt);
-    if (llmResult && (llmResult.command || llmResult.suggestedScript) && llmResult.dockerImage) {
+    if (
+      llmResult &&
+      typeof llmResult.command === "string" &&
+      typeof llmResult.dockerImage === "string" &&
+      (!llmResult.suggestedScript || typeof llmResult.suggestedScript === "string")
+    ) {
+      const availableVram = Number(gpuVram) || 8;
+      const batchSize = Number.isInteger(llmResult.batchSize) && llmResult.batchSize > 0
+        ? llmResult.batchSize
+        : availableVram >= 16 ? 64 : availableVram >= 8 ? 32 : 8;
+      const datasetPath = datasetName ? `/workspace/data/${datasetName}` : "";
+      const activeScript = llmResult.suggestedScript || scriptContent || "";
+      const datasetReferenceText = `${activeScript}\n${llmResult.command || ""}`.toLowerCase();
+      const llmEnv = llmResult.suggestedEnv &&
+        typeof llmResult.suggestedEnv === "object" &&
+        !Array.isArray(llmResult.suggestedEnv)
+        ? llmResult.suggestedEnv
+        : {};
+      const datasetUsed = Boolean(
+        datasetName &&
+        (datasetReferenceText.includes(datasetName.toLowerCase()) ||
+          datasetReferenceText.includes("dataset_path") ||
+          datasetReferenceText.includes("/workspace/data/"))
+      );
+      const checkpointSupported = Boolean(
+        activeScript &&
+        activeScript.includes("CHECKPOINT_DIR") &&
+        (activeScript.includes("torch.save") || activeScript.includes("save_pretrained")) &&
+        activeScript.includes("RESUME_FROM_CHECKPOINT") &&
+        (activeScript.includes("torch.load") || activeScript.includes("from_pretrained"))
+      );
       return res.json({
         source: "llm",
         ...llmResult,
+        batchSize,
+        checkpointSupported,
+        checkpointPlan: checkpointSupported
+          ? "The script to be run includes checkpoint save and restore logic."
+          : "Could not verify checkpoint save and restore logic in the script to be run.",
+        datasetUsed,
+        datasetPlan: datasetName
+          ? datasetUsed
+            ? `The returned script references the uploaded dataset (${datasetName}).`
+            : `The dataset is mounted at ${datasetPath}, but the returned script does not reference it. Review or edit the script before submitting.`
+          : "",
+        suggestedEnv: {
+          ...llmEnv,
+          BATCH_SIZE: String(batchSize),
+          ...(datasetPath ? { DATASET_PATH: datasetPath } : {}),
+        },
+        datasetPath,
       });
     }
 
@@ -659,9 +732,39 @@ Return pure JSON matching the schema.`;
       scriptName,
       scriptContent,
     });
+    const availableVram = Number(gpuVram) || 8;
+    const batchSize = Number.isInteger(localResult.batchSize) && localResult.batchSize > 0
+      ? localResult.batchSize
+      : availableVram >= 16 ? 64 : availableVram >= 8 ? 32 : 8;
+    const datasetPath = datasetName ? `/workspace/data/${datasetName}` : "";
+    const activeScript = localResult.suggestedScript || scriptContent || "";
+    const datasetReferenceText = `${activeScript}\n${localResult.command || ""}`.toLowerCase();
+    const datasetUsed = Boolean(
+      datasetName &&
+      (datasetReferenceText.includes(datasetName.toLowerCase()) ||
+        datasetReferenceText.includes("dataset_path") ||
+        datasetReferenceText.includes("/workspace/data/"))
+    );
     return res.json({
       source: "local-engine",
       ...localResult,
+      batchSize,
+      checkpointPlan: localResult.checkpointPlan ||
+        (localResult.checkpointSupported
+          ? "The script to be run includes checkpoint save and restore logic."
+          : "This recommendation does not include checkpoint save and restore logic."),
+      datasetUsed,
+      datasetPlan: datasetName
+        ? datasetUsed
+          ? `The returned script references the uploaded dataset (${datasetName}).`
+          : `The dataset is mounted at ${datasetPath}, but local rules did not generate code to read it. Add a script or configure a hosted AI provider before submitting a real training workload.`
+        : "",
+      suggestedEnv: {
+        ...(localResult.suggestedEnv || {}),
+        BATCH_SIZE: String(batchSize),
+        ...(datasetPath ? { DATASET_PATH: datasetPath } : {}),
+      },
+      datasetPath,
     });
   } catch (error) {
     logger.error(`AI Assistant error: ${error.message}`);

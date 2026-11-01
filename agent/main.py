@@ -177,6 +177,8 @@ def start_scheduler_thread() -> None:
                         "token": settings.agent_jwt_token,
                         "script_name": job.get("scriptName") or "",
                         "input_download_url": claim.get("inputDownloadUrl") or "",
+                        "dataset_name": job.get("datasetName") or "",
+                        "dataset_download_url": claim.get("datasetDownloadUrl") or "",
                         "script_content": job.get("legacyScriptContent") or "",
                         "attempt": attempt,
                         "checkpoint_download_url": claim.get("checkpointDownloadUrl") or "",
