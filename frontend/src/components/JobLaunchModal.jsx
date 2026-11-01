@@ -340,30 +340,35 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
   const submitJob = async () => {
     let inputObjectKey = '';
     if (scriptName) {
-      try {
-        const lower = scriptName.toLowerCase();
-        const contentType = lower.endsWith('.sh')
-          ? 'text/x-shellscript'
-          : lower.endsWith('.ipynb')
-          ? 'application/x-ipynb+json'
-          : 'text/x-python';
-        const scriptBlob = new Blob([scriptContent], { type: contentType });
-        const { data: upload } = await api.post('/jobs/uploads/presign', {
-          fileName: scriptName,
-          size: scriptBlob.size,
-        });
-        if (upload && upload.storageAvailable !== false && upload.url && upload.fields) {
-          const uploadFormData = new FormData();
-          Object.entries(upload.fields).forEach(([key, value]) => uploadFormData.append(key, value));
-          uploadFormData.append('file', scriptBlob, scriptName);
-          const uploadResponse = await fetch(upload.url, { method: 'POST', body: uploadFormData });
-          if (uploadResponse.ok) {
-            inputObjectKey = upload.objectKey;
-          }
-        }
-      } catch (storageErr) {
-        console.warn('Object storage presign/upload not available, falling back to direct script payload:', storageErr);
+      const lower = scriptName.toLowerCase();
+      const contentType = lower.endsWith('.sh')
+        ? 'text/x-shellscript'
+        : lower.endsWith('.ipynb')
+        ? 'application/x-ipynb+json'
+        : 'text/x-python';
+      const scriptBlob = new Blob([scriptContent], { type: contentType });
+      const { data: upload } = await api.post('/jobs/uploads/presign', {
+        fileName: scriptName,
+        size: scriptBlob.size,
+      });
+
+      if (!upload?.url || !upload?.fields || !upload?.objectKey) {
+        throw new Error('S3 did not provide a valid upload request. Check object storage configuration.');
       }
+
+      const uploadFormData = new FormData();
+      Object.entries(upload.fields).forEach(([key, value]) => uploadFormData.append(key, value));
+      uploadFormData.append('file', scriptBlob, scriptName);
+      let uploadResponse;
+      try {
+        uploadResponse = await fetch(upload.url, { method: 'POST', body: uploadFormData });
+      } catch {
+        throw new Error('Could not reach S3. Check the bucket CORS and endpoint settings, then try again.');
+      }
+      if (!uploadResponse.ok) {
+        throw new Error(`S3 script upload failed (HTTP ${uploadResponse.status}). Please try again.`);
+      }
+      inputObjectKey = upload.objectKey;
     }
 
     const payload = {
@@ -371,7 +376,6 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, 
       vramRequired: parseFloat(formData.vramRequired),
       gpuId: gpu?._id,
       scriptName: scriptName || "",
-      scriptContent: scriptContent || "",
       inputObjectKey,
     };
     const resp = await api.post('/jobs', payload);

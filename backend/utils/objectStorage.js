@@ -1,5 +1,6 @@
 import {
   GetObjectCommand,
+  HeadBucketCommand,
   HeadObjectCommand,
   PutObjectCommand,
   S3Client,
@@ -43,6 +44,7 @@ const getClient = () => {
 
 export const createInputUpload = async ({ key, contentType }) => {
   const Bucket = getBucket();
+  await getClient().send(new HeadBucketCommand({ Bucket }));
   return createPresignedPost(getClient(), {
     Bucket,
     Key: key,

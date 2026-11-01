@@ -1,19 +1,61 @@
 # Job file storage
 
-Job scripts and outputs are stored in an S3-compatible bucket. The backend signs short-lived upload and download requests; the browser and GPU agents transfer files directly to the bucket. GPU agents do not need bucket credentials.
+Job scripts and outputs are stored in a private S3-compatible bucket. The backend signs short-lived upload and download requests; the browser uploads scripts directly to S3, and GPU agents download them directly from S3. GPU agents do not need bucket credentials. Script submissions fail with a clear error if S3 is unavailable; script contents are not stored in MongoDB as a fallback.
 
-Add these backend environment variables:
+## AWS S3 setup
 
-```text
-OBJECT_STORAGE_BUCKET=your-bucket
-OBJECT_STORAGE_REGION=us-east-1
-OBJECT_STORAGE_ACCESS_KEY_ID=...
-OBJECT_STORAGE_SECRET_ACCESS_KEY=...
+1. Create a private S3 bucket and note its exact AWS region.
+2. Give the backend AWS identity (preferably an IAM role) this least-privilege policy, replacing the bucket name:
+
+```json
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Effect": "Allow",
+      "Action": ["s3:PutObject", "s3:GetObject"],
+      "Resource": "arn:aws:s3:::your-bucket/jobs/*"
+    },
+    {
+      "Effect": "Allow",
+      "Action": ["s3:ListBucket"],
+      "Resource": "arn:aws:s3:::your-bucket"
+    }
+  ]
+}
 ```
 
-For AWS, omit `OBJECT_STORAGE_ENDPOINT`; the backend can use its normal AWS credential provider chain instead of access-key variables. For MinIO or another S3-compatible service, set `OBJECT_STORAGE_ENDPOINT` to its URL and provide credentials.
+3. Configure the backend environment in the repository-root `.env`:
 
-The bucket must already exist. Configure bucket CORS to allow the frontend origin to make `POST` uploads with the `Content-Type` header. The backend limits script uploads to 50 MB and job output archives to 2 GB. Presigned requests expire after 15 minutes.
+```dotenv
+OBJECT_STORAGE_BUCKET=your-bucket
+OBJECT_STORAGE_REGION=your-bucket-region
+OBJECT_STORAGE_ENDPOINT=
+OBJECT_STORAGE_ACCESS_KEY_ID=
+OBJECT_STORAGE_SECRET_ACCESS_KEY=
+```
+
+For AWS, leave `OBJECT_STORAGE_ENDPOINT` empty and use the normal AWS credential provider chain (an IAM role is recommended). If using IAM access keys instead, set both access-key variables and keep them out of source control. For MinIO or another S3-compatible service, set its endpoint URL and credentials. Restart the backend after changing environment variables.
+
+4. Configure the bucket's **CORS** to allow the exact origin(s) where the frontend runs. For local Vite development, allow `http://localhost:5173` and/or `http://127.0.0.1:5173`; for production, allow your deployed frontend origin. Example:
+
+```json
+[
+  {
+    "AllowedHeaders": ["Content-Type"],
+    "AllowedMethods": ["POST", "GET", "PUT", "HEAD"],
+    "AllowedOrigins": ["http://localhost:5173", "http://127.0.0.1:5173"],
+    "ExposeHeaders": ["ETag"],
+    "MaxAgeSeconds": 3000
+  }
+]
+```
+
+The bucket must exist before uploads. Keep S3 Block Public Access enabled; the application uses presigned URLs and does not require public bucket access. The backend limits script uploads to 50 MB and job output archives to 2 GB. Presigned requests expire after 15 minutes.
+
+With the backend dependencies installed and credentials available, `cd backend && npm run create-bucket` can create a private AWS bucket, configure local CORS origins, and write its name to the local `.env`. Review the generated bucket name and region before deploying.
+
+The upload flow requests a presigned POST, sends the script from the browser to S3, and submits only the S3 object key to the backend. The backend verifies the uploaded object's size and content type before queueing. The GPU agent receives a presigned download URL. If storage is missing or the upload/download fails, the job is rejected or returned to the queue instead of silently storing or using a database copy.
 
 Scripts are mounted in the container at `/workspace`. Jobs that produce files should write them under `/workspace/output` (also available as the `OUTPUT_DIR` environment variable); the agent packages that directory as a ZIP for download from the Jobs page. If that directory is empty, the job can still succeed but has no downloadable output.
 
