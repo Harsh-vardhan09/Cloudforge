@@ -28,7 +28,7 @@ const GpuCard = ({ gpu, onDeploy }) => (
       </div>
     </div>
 
-    <div className="grid grid-cols-2 gap-3 border-y border-white/[0.07] py-4">
+    <div className="grid grid-cols-2 gap-3 border-y border-ink/15 py-4">
       <div className="flex items-center gap-2.5 text-text-dim">
         <HardDrive size={16} className="shrink-0 text-primary" />
         <div className="flex flex-col">
@@ -49,7 +49,7 @@ const GpuCard = ({ gpu, onDeploy }) => (
         disabled={gpu.status !== 'available'}
         onClick={() => onDeploy(gpu)}
         className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all
-        ${gpu.status !== 'available' ? 'cursor-not-allowed bg-surface-hover text-text-dim' : 'bg-primary text-background hover:-translate-y-0.5 hover:bg-[#d4ff80] hover:shadow-glow'}`}>
+        ${gpu.status !== 'available' ? 'cursor-not-allowed bg-surface-hover text-text-dim' : 'bg-primary text-background hover:-translate-y-0.5 hover:bg-accent hover:shadow-glow'}`}>
         {gpu.status === 'available' ? 'Deploy Now' : 'Unavailable'}
         {gpu.status === 'available' && <ArrowUpRight size={16} />}
       </button>
@@ -99,7 +99,7 @@ const Market = () => {
             <p className="mt-2 max-w-xl text-sm leading-6 text-text-dim">Browse community-powered hardware and launch your workload on the resources that fit.</p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row">
-            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3 transition-colors focus-within:border-primary/40">
+            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-ink/15 bg-surface-muted px-4 py-3 transition-colors focus-within:border-primary/40">
               <Search size={17} className="shrink-0 text-text-dim" />
               <input
                 type="search"
@@ -110,7 +110,7 @@ const Market = () => {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
-            <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-white/[0.08] bg-black/20 p-1">
+            <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-ink/15 bg-surface-muted p-1">
               {['all', 'available', 'busy', 'offline'].map((status) => (
                 <button
                   key={status}

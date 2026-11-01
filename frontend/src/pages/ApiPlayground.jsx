@@ -64,14 +64,14 @@ const ApiPlayground = () => {
 
     return (
         <div className="flex flex-col h-[calc(100vh-140px)] gap-6">
-            <header className="flex justify-between items-center bg-white/[0.02] p-4 px-6 rounded-2xl border border-white/5 backdrop-blur-md">
+            <header className="flex justify-between items-center bg-white/[0.02] p-4 px-6 rounded-2xl border border-ink/10 backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">
                         <MessageSquare size={20} />
                     </div>
                     <div>
                         <h2 className="text-lg font-bold">AI Playground</h2>
-                        <p className="text-[0.65rem] text-text-dim uppercase tracking-widest font-black">Interactive Sandbox</p>
+                        <p className="text-[0.65rem] text-text-dim uppercase tracking-widest font-extrabold">Interactive Sandbox</p>
                     </div>
                 </div>
 
@@ -80,7 +80,7 @@ const ApiPlayground = () => {
                         <Loader2 className="animate-spin text-primary" size={20} />
                     ) : (
                         <select 
-                            className="bg-black/40 border border-white/10 rounded-xl p-2 px-4 text-xs font-bold outline-none focus:border-primary transition-all"
+                            className="bg-surface-muted border border-ink/15 rounded-xl p-2 px-4 text-xs font-bold outline-none focus:border-primary transition-all"
                             value={selectedModel?._id || ''}
                             onChange={(e) => setSelectedModel(rentedModels.find(m => m._id === e.target.value))}
                         >
@@ -93,7 +93,7 @@ const ApiPlayground = () => {
                     )}
                     <button 
                         onClick={() => setMessages([])}
-                        className="p-2.5 rounded-xl bg-white/5 hover:bg-error/20 hover:text-error transition-all border border-white/5"
+                        className="p-2.5 rounded-xl bg-white/5 hover:bg-error/20 hover:text-error transition-all border border-ink/10"
                         title="Clear Chat"
                     >
                         <Trash2 size={16} />
@@ -112,7 +112,7 @@ const ApiPlayground = () => {
                     className="flex-1 overflow-y-auto p-8 flex flex-col gap-6 scroll-smooth"
                 >
                     {messages.length === 0 && (
-                        <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 opacity-40">
+                        <div className="flex-1 flex flex-col items-center justify-center text-center gap-4 text-text-dim">
                             <Bot size={64} className="text-primary" />
                             <div>
                                 <h3 className="text-xl font-bold">Start a conversation</h3>
@@ -135,7 +135,7 @@ const ApiPlayground = () => {
                                 <div className={`p-4 rounded-2xl text-sm leading-relaxed ${
                                     msg.role === 'user' 
                                     ? 'bg-primary/20 border border-primary/20 text-white rounded-tr-none' 
-                                    : 'bg-white/5 border border-white/5 text-text-dim rounded-tl-none'
+                                    : 'bg-white/5 border border-ink/10 text-text-dim rounded-tl-none'
                                 } ${msg.isError ? 'border-error/50 text-error bg-error/5' : ''}`}>
                                     {msg.content}
                                 </div>
@@ -148,7 +148,7 @@ const ApiPlayground = () => {
                              <div className="w-8 h-8 rounded-lg bg-secondary/20 text-secondary flex items-center justify-center shrink-0 animate-pulse">
                                 <Bot size={16} />
                             </div>
-                            <div className="p-4 bg-white/5 border border-white/5 rounded-2xl rounded-tl-none flex items-center gap-2">
+                            <div className="p-4 bg-white/5 border border-ink/10 rounded-2xl rounded-tl-none flex items-center gap-2">
                                 <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.3s]" />
                                 <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce [animation-delay:-0.15s]" />
                                 <div className="w-1.5 h-1.5 bg-primary rounded-full animate-bounce" />
@@ -164,7 +164,7 @@ const ApiPlayground = () => {
                             type="text"
                             placeholder={selectedModel ? `Message ${selectedModel.name}...` : "Please rent a model first"}
                             disabled={!selectedModel || loading}
-                            className="w-full bg-black/40 border border-white/10 p-5 pr-16 rounded-2xl outline-none focus:border-primary/50 backdrop-blur-xl transition-all relative z-[1]"
+                            className="w-full bg-surface-muted border border-ink/15 p-5 pr-16 rounded-2xl outline-none focus:border-primary/50 backdrop-blur-xl transition-all relative z-[1]"
                             value={input}
                             onChange={e => setInput(e.target.value)}
                         />
@@ -188,7 +188,7 @@ const ApiPlayground = () => {
                             </div>
                         </div>
                         {selectedModel && (
-                            <p className="text-[0.65rem] text-primary/60 font-black italic">
+                            <p className="text-[0.65rem] text-primary/60 font-extrabold italic">
                                 Rates: ${selectedModel.hourlyRate}/hr + ${selectedModel.tokenRate}/1M tokens
                             </p>
                         )}

@@ -47,28 +47,28 @@ const Migration = () => {
 
         {/* Highlights metrics strip */}
         <div className="relative z-10 mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
-          <div className="rounded-xl border border-white/[0.07] bg-black/30 p-3.5 flex flex-col gap-1">
+          <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
             <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Checkpoint Retention</span>
             <span className="text-xl font-bold text-success flex items-center gap-1">
               <ShieldCheck size={18} /> 100.0%
             </span>
           </div>
 
-          <div className="rounded-xl border border-white/[0.07] bg-black/30 p-3.5 flex flex-col gap-1">
+          <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
             <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Warm Hydration Latency</span>
             <span className="text-xl font-bold text-primary flex items-center gap-1">
               <Zap size={18} /> 1.4s Avg
             </span>
           </div>
 
-          <div className="rounded-xl border border-white/[0.07] bg-black/30 p-3.5 flex flex-col gap-1">
+          <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
             <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Host Reclaim Latency</span>
             <span className="text-xl font-bold text-amber-400 flex items-center gap-1">
               <RotateCcw size={18} /> Instant
             </span>
           </div>
 
-          <div className="rounded-xl border border-white/[0.07] bg-black/30 p-3.5 flex flex-col gap-1">
+          <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
             <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Total Zero-Loss Resumes</span>
             <span className="text-xl font-bold text-white flex items-center gap-1">
               <Network size={18} /> 142 Completed

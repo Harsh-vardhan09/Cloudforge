@@ -208,7 +208,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-black/85 backdrop-blur-md"
+        className="absolute inset-0 bg-ink/30 backdrop-blur-md"
         onClick={onClose}
       />
       <Motion.div
@@ -253,7 +253,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
               setApplied(false);
             }}
             placeholder="Train a PyTorch image classifier on my CIFAR-10 script, using the GPU"
-            className="w-full resize-y rounded-xl border border-white/10 bg-black/40 p-3 text-sm text-white placeholder-white/40 focus:border-purple-400 focus:outline-none"
+            className="w-full resize-y rounded-xl border border-ink/15 bg-surface-muted p-3 text-sm text-white placeholder-white/40 focus:border-purple-400 focus:outline-none"
           />
           <div className="grid gap-3 sm:grid-cols-2">
             <div className="flex min-w-0 flex-col gap-2">
@@ -267,7 +267,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
               <button
                 type="button"
                 onClick={() => scriptInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
+                className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
               >
                 <FileCode size={16} />
                 {scriptName || 'Add script (optional)'}
@@ -285,7 +285,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
               <button
                 type="button"
                 onClick={() => datasetInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-xl border border-white/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
+                className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
               >
                 <Database size={16} />
                 {datasetFile?.name || 'Add dataset (optional)'}
@@ -305,7 +305,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                     setApplied(false);
                     if (scriptInputRef.current) scriptInputRef.current.value = '';
                   }}
-                  className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
+                  className="flex items-center gap-1 rounded-lg border border-ink/15 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
                 >
                   <Trash2 size={12} /> Remove script
                 </button>
@@ -319,7 +319,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                     setApplied(false);
                     if (datasetInputRef.current) datasetInputRef.current.value = '';
                   }}
-                  className="flex items-center gap-1 rounded-lg border border-white/10 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
+                  className="flex items-center gap-1 rounded-lg border border-ink/15 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
                 >
                   <Trash2 size={12} /> Remove dataset
                 </button>
@@ -374,22 +374,22 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                 </p>
               )}
               <div className="grid gap-3 text-xs sm:grid-cols-2">
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
                   <span className="flex items-center gap-1.5 text-text-dim"><Server size={13} /> Docker image</span>
                   <p className="mt-1 break-all font-mono text-white">{recommendation.dockerImage}</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
                   <span className="flex items-center gap-1.5 text-text-dim"><Cpu size={13} /> GPU memory</span>
                   <p className="mt-1 text-white">{recommendation.vramRequired} GB</p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
                   <span className="text-text-dim">Suggested batch size</span>
                   <p className="mt-1 text-white">
                     {recommendation.batchSize ?? 'Not specified'}
                     <span className="ml-1 text-text-dim">· use if the script supports it</span>
                   </p>
                 </div>
-                <div className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
                   <span className="text-text-dim">Checkpointing</span>
                   <p className="mt-1 text-white">{recommendation.checkpointPlan || 'No checkpoint plan provided.'}</p>
                 </div>
@@ -405,7 +405,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                 </p>
               )}
               {recommendation.suggestedScript && (
-                <details className="rounded-xl border border-white/10 bg-black/20 p-3">
+                <details className="rounded-xl border border-ink/15 bg-surface-muted p-3">
                   <summary className="cursor-pointer text-xs font-semibold text-white">
                     Review suggested script · {recommendation.suggestedScriptName || scriptName || 'recommended_job.py'}
                   </summary>
@@ -413,11 +413,11 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                     rows={10}
                     value={recommendation.suggestedScript}
                     onChange={(event) => setRecommendation({ ...recommendation, suggestedScript: event.target.value })}
-                    className="mt-3 w-full rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-xs text-white focus:border-primary focus:outline-none"
+                    className="mt-3 w-full rounded-lg border border-ink/15 bg-surface-muted p-3 font-mono text-xs text-white focus:border-primary focus:outline-none"
                   />
                 </details>
               )}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-white/10 pt-3">
+              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/15 pt-3">
                 <div className="min-w-0 text-[0.7rem] text-text-dim">
                   <p className="truncate">Command: <code className="text-white">{recommendation.command}</code></p>
                   {recommendation.datasetPath && <p>Dataset path: <code className="text-white">{recommendation.datasetPath}</code></p>}
@@ -426,7 +426,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                   type="button"
                   onClick={applyRecommendation}
                   disabled={applied}
-                  className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-black hover:brightness-110 disabled:opacity-70"
+                  className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-text hover:brightness-110 disabled:opacity-70"
                 >
                   {applied ? <Check size={14} /> : <ArrowRight size={14} />}
                   {applied ? 'Applied' : 'Apply plan'}
@@ -437,7 +437,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
         </AnimatePresence>
 
         {applied && (
-          <div className="flex flex-col gap-2 rounded-xl border border-white/10 bg-white/[0.03] p-4 text-xs text-text-dim">
+          <div className="flex flex-col gap-2 rounded-xl border border-ink/15 bg-white/[0.03] p-4 text-xs text-text-dim">
             <span className="font-semibold text-white">Ready to submit</span>
             <span>{dockerImage} · {vramRequired} GB VRAM · {scriptName || 'Generated command'}</span>
             {scriptName && (
@@ -447,7 +447,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
                   rows={8}
                   value={scriptContent}
                   onChange={(event) => setScriptContent(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-white/10 bg-black/40 p-3 font-mono text-xs text-white"
+                  className="mt-2 w-full rounded-lg border border-ink/15 bg-surface-muted p-3 font-mono text-xs text-white"
                 />
               </details>
             )}
@@ -461,7 +461,7 @@ const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }
           </div>
         )}
 
-        <footer className="flex flex-col gap-3 border-t border-white/10 pt-4 sm:flex-row">
+        <footer className="flex flex-col gap-3 border-t border-ink/15 pt-4 sm:flex-row">
           <button
             type="button"
             onClick={submitJob}
