@@ -100,6 +100,9 @@ GPU registered with backend
 Your GPU now appears on the **Take GPU** marketplace and the agent begins polling
 for jobs. Leave it running; stop it with Ctrl+C.
 
+If the default port `7000` is already in use, the agent automatically tries
+ports `7001` through `7100` and registers the selected port with the backend.
+
 ## How a job runs
 
 1. The agent claims a queued job it has enough VRAM for, taking a 30-second lease
@@ -136,11 +139,12 @@ The backend marks a GPU offline after 60 seconds without a heartbeat. Check the
 agent is running and can reach `BACKEND_URL`.
 
 **Host reclaim doesn't work**
-Reclaim needs the backend to reach this agent on `AGENT_PORT` (default 7000).
-Allow that port from the backend's address. Everything else works without it.
+Reclaim needs the backend to reach this agent on `AGENT_PORT` (default 7000; the
+agent selects another available port from `7001`–`7100` if needed). Allow the
+selected port from the backend's address. Everything else works without it.
 
 ## Packaging the Windows download
 
 From the repository root, run `python agent/package_windows.py` to regenerate
-`frontend/public/downloads/computegrid-gpu-agent-windows-v4.zip` after changing
+`frontend/public/downloads/computegrid-gpu-agent-windows-v5.zip` after changing
 the agent or installer.
