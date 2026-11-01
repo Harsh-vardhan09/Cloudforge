@@ -55,11 +55,9 @@ export const createInputUploadUrl = async (req, res, next) => {
       storageAvailable: true,
     });
   } catch (error) {
-    logger.warn(`Presigned upload setup unavailable (${error.message}). Direct script content fallback enabled.`);
-    res.json({
-      storageAvailable: false,
-      directPayloadPreferred: true,
-      message: "Object storage is currently unconfigured; submit scriptContent directly in job payload.",
+    logger.error(`Could not create S3 upload request: ${error.message}`);
+    res.status(503).json({
+      message: "S3 script storage is unavailable. Configure the object storage bucket and credentials, then try again.",
     });
   }
 };
@@ -68,6 +66,12 @@ import User from "../models/user.model.js";
 
 // POST /api/jobs — user submits a job or uploads a script/notebook
 export const postJob = async (req, res, next) => {
+  if (typeof req.body.scriptContent === "string" && req.body.scriptContent.length > 0) {
+    return res.status(400).json({
+      message: "Direct script content is no longer accepted. Upload scripts to S3 before submitting the job.",
+    });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     if (!user || user.creditBalance <= 0) {
@@ -77,8 +81,8 @@ export const postJob = async (req, res, next) => {
     return next(err);
   }
 
-  const { dockerImage, command, vramRequired, env, gpuId, scriptName, inputObjectKey, scriptContent } = req.body;
-  const hasScript = Boolean(scriptName || inputObjectKey || scriptContent);
+  const { dockerImage, command, vramRequired, env, gpuId, scriptName, inputObjectKey } = req.body;
+  const hasScript = Boolean(scriptName || inputObjectKey);
 
   if (
     scriptName &&
@@ -112,8 +116,8 @@ export const postJob = async (req, res, next) => {
       message: "Either a script file or command is required",
     });
   }
-  if (hasScript && !inputObjectKey && !scriptContent) {
-    return res.status(400).json({ message: "Upload the script or provide script content before submitting the job" });
+  if (hasScript && (!scriptName || !inputObjectKey)) {
+    return res.status(400).json({ message: "Upload the script to S3 before submitting the job" });
   }
   if (
     inputObjectKey &&
@@ -123,11 +127,36 @@ export const postJob = async (req, res, next) => {
   ) {
     return res.status(403).json({ message: "Input file does not belong to this user" });
   }
+  if (inputObjectKey && !scriptName) {
+    return res.status(400).json({ message: "A filename is required for an S3 script upload" });
+  }
 
   try {
+    if (inputObjectKey) {
+      let metadata;
+      try {
+        metadata = await getObjectMetadata(inputObjectKey);
+      } catch (error) {
+        logger.warn(`Could not verify uploaded script in S3: ${error.message}`);
+        return res.status(502).json({ message: "Could not verify the script upload in S3. Please upload it again." });
+      }
+
+      const expectedContentType = INPUT_CONTENT_TYPES[
+        scriptName.slice(scriptName.lastIndexOf(".")).toLowerCase()
+      ];
+      if (
+        !Number.isInteger(metadata.contentLength) ||
+        metadata.contentLength < 1 ||
+        metadata.contentLength > MAX_INPUT_BYTES ||
+        metadata.contentType !== expectedContentType
+      ) {
+        return res.status(400).json({ message: "The S3 script upload is incomplete or has an invalid content type" });
+      }
+    }
+
     const initialLogs = [];
     if (scriptName) {
-      initialLogs.push(`[upload] Script '${scriptName}' stored for the GPU agent to download`);
+      initialLogs.push(`[upload] Script '${scriptName}' stored in S3 for the GPU agent to download`);
     }
     initialLogs.push(`[queue] 📥 Job created in QUEUED status`);
 
@@ -140,7 +169,6 @@ export const postJob = async (req, res, next) => {
       vramRequired: finalVram,
       env: env || {},
       scriptName: scriptName || "",
-      scriptContent: scriptContent || "",
       inputObjectKey: inputObjectKey || "",
       status: "queued",
       logs: initialLogs,
@@ -310,16 +338,10 @@ export const claimJob = async (req, res, next) => {
       let legacyScriptContent = "";
       try {
         if (job.inputObjectKey) {
-          try {
-            inputDownloadUrl = await createObjectDownloadUrl(
-              job.inputObjectKey,
-              job.scriptName || "input"
-            );
-          } catch (storageErr) {
-            logger.warn(`Could not prepare S3 download URL (${storageErr.message}); falling back to stored database script`);
-            const fallbackJob = await Job.findById(job._id).select("+scriptContent");
-            legacyScriptContent = fallbackJob?.scriptContent || "";
-          }
+          inputDownloadUrl = await createObjectDownloadUrl(
+            job.inputObjectKey,
+            job.scriptName || "input"
+          );
         }
         
         if (!inputDownloadUrl && job.scriptName) {
@@ -1385,4 +1407,3 @@ export const getJobMigration = async (req, res, next) => {
     next(error);
   }
 };
-
