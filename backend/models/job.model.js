@@ -100,6 +100,14 @@ const JobSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    datasetName: {
+      type: String,
+      default: "",
+    },
+    datasetObjectKey: {
+      type: String,
+      default: "",
+    },
     outputObjectKey: {
       type: String,
       default: "",

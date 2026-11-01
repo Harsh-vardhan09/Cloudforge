@@ -5,7 +5,14 @@ import api from '../services/api';
 import JobLaunchModal from '../components/JobLaunchModal';
 import { useNavigate } from 'react-router-dom';
 
-const GpuCard = ({ gpu, onDeploy }) => (
+const SHOWCASE_GPUS = [
+  { _id: 'showcase-rtx-4090', model: 'NVIDIA RTX 4090', vram: 24, pricePerHour: 0.72 },
+  { _id: 'showcase-rtx-3090', model: 'NVIDIA RTX 3090', vram: 24, pricePerHour: 0.48 },
+  { _id: 'showcase-a100', model: 'NVIDIA A100', vram: 40, pricePerHour: 1.35 },
+  { _id: 'showcase-l40s', model: 'NVIDIA L40S', vram: 48, pricePerHour: 1.08 },
+];
+
+const GpuCard = ({ gpu, onDeploy, isShowcase = false, canDeploy = true, unavailableReason = '' }) => (
   <Motion.div
     layout
     initial={{ opacity: 0, scale: 0.9 }}
@@ -19,16 +26,24 @@ const GpuCard = ({ gpu, onDeploy }) => (
           <Cpu size={19} />
         </div>
         <h4 className="truncate text-lg font-semibold tracking-tight">{gpu.model}</h4>
-        <span className="text-[0.75rem] text-text-dim">via {gpu.host?.name || 'Unknown Provider'}</span>
+        <span className="text-[0.75rem] text-text-dim">
+          {isShowcase ? 'Sample listing · runs on your GPU' : `via ${gpu.host?.name || 'Unknown Provider'}`}
+        </span>
       </div>
-      <div className={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-wider
-        ${gpu.status === 'available' ? 'bg-success/10 text-success border-success/20' :
-          gpu.status === 'busy' ? 'bg-error/10 text-error border-error/20' : 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
-        {gpu.status}
-      </div>
+      {isShowcase ? (
+        <div className="rounded-full border border-accent/30 bg-accent/15 px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-wider text-text">
+          Demo
+        </div>
+      ) : (
+        <div className={`rounded-full border px-2.5 py-1 text-[0.62rem] font-semibold uppercase tracking-wider
+          ${gpu.status === 'available' ? 'bg-success/10 text-success border-success/20' :
+            gpu.status === 'busy' ? 'bg-error/10 text-error border-error/20' : 'bg-gray-500/10 text-gray-500 border-gray-500/20'}`}>
+          {gpu.status}
+        </div>
+      )}
     </div>
 
-    <div className="grid grid-cols-2 gap-3 border-y border-white/[0.07] py-4">
+    <div className="grid grid-cols-2 gap-3 border-y border-ink/15 py-4">
       <div className="flex items-center gap-2.5 text-text-dim">
         <HardDrive size={16} className="shrink-0 text-primary" />
         <div className="flex flex-col">
@@ -46,12 +61,14 @@ const GpuCard = ({ gpu, onDeploy }) => (
     </div>
 
       <button
-        disabled={gpu.status !== 'available'}
+        disabled={isShowcase ? !canDeploy : gpu.status !== 'available'}
         onClick={() => onDeploy(gpu)}
         className={`flex w-full items-center justify-center gap-2 rounded-xl py-2.5 text-sm font-semibold transition-all
-        ${gpu.status !== 'available' ? 'cursor-not-allowed bg-surface-hover text-text-dim' : 'bg-primary text-background hover:-translate-y-0.5 hover:bg-[#d4ff80] hover:shadow-glow'}`}>
-        {gpu.status === 'available' ? 'Deploy Now' : 'Unavailable'}
-        {gpu.status === 'available' && <ArrowUpRight size={16} />}
+        ${(isShowcase ? !canDeploy : gpu.status !== 'available') ? 'cursor-not-allowed bg-surface-hover text-text-dim' : 'bg-primary text-background hover:-translate-y-0.5 hover:bg-accent hover:shadow-glow'}`}>
+        {isShowcase
+          ? canDeploy ? 'Run on my GPU' : unavailableReason || 'Connect your GPU'
+          : gpu.status === 'available' ? 'Deploy Now' : 'Unavailable'}
+        {(isShowcase ? canDeploy : gpu.status === 'available') && <ArrowUpRight size={16} />}
       </button>
   </Motion.div>
 );
@@ -63,6 +80,8 @@ const Market = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const [selectedGpu, setSelectedGpu] = useState(null);
+  const [myGpu, setMyGpu] = useState(null);
+  const [myGpuLoading, setMyGpuLoading] = useState(true);
   const [statusFilter, setStatusFilter] = useState('available'); // default to online/available
 
   const fetchGpus = useCallback(async () => {
@@ -84,9 +103,55 @@ const Market = () => {
     fetchGpus();
   }, [fetchGpus]);
 
+  useEffect(() => {
+    let active = true;
+    const refreshMyGpu = () => {
+      api.get('/gpu/my')
+        .then(({ data }) => {
+          if (active) setMyGpu(data);
+        })
+        .catch((requestError) => {
+          if (!active) return;
+          if (requestError.response?.status === 404) {
+            setMyGpu(null);
+          } else {
+            console.error('Could not check your registered GPU:', requestError);
+          }
+        })
+        .finally(() => {
+          if (active) setMyGpuLoading(false);
+        });
+    };
+    refreshMyGpu();
+    const intervalId = window.setInterval(refreshMyGpu, 15_000);
+
+    return () => {
+      active = false;
+      window.clearInterval(intervalId);
+    };
+  }, []);
+
+  const myGpuOnline = Boolean(
+    myGpu &&
+    myGpu.acceptingJobs !== false &&
+    ['available', 'busy'].includes(myGpu.status) &&
+    Date.now() - new Date(myGpu.lastSeen).getTime() <= 60_000
+  );
+  const showcaseUnavailableReason = myGpuLoading
+    ? 'Checking your GPU…'
+    : !myGpu
+      ? 'Register your GPU first'
+      : myGpuOnline
+        ? ''
+        : 'Your GPU is offline';
+
   const filteredGpus = gpus.filter(gpu =>
     gpu.model.toLowerCase().includes(search.toLowerCase())
   );
+  const filteredShowcaseGpus = SHOWCASE_GPUS.filter(gpu =>
+    gpu.model.toLowerCase().includes(search.toLowerCase())
+  );
+  const showShowcaseGpus = statusFilter === 'all' || statusFilter === 'available';
 
   return (
     <div className="flex flex-col gap-6">
@@ -99,7 +164,7 @@ const Market = () => {
             <p className="mt-2 max-w-xl text-sm leading-6 text-text-dim">Browse community-powered hardware and launch your workload on the resources that fit.</p>
           </div>
           <div className="flex flex-col gap-3 lg:flex-row">
-            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-white/[0.09] bg-black/20 px-4 py-3 transition-colors focus-within:border-primary/40">
+            <label className="flex min-w-0 flex-1 items-center gap-3 rounded-xl border border-ink/15 bg-surface-muted px-4 py-3 transition-colors focus-within:border-primary/40">
               <Search size={17} className="shrink-0 text-text-dim" />
               <input
                 type="search"
@@ -110,7 +175,7 @@ const Market = () => {
                 onChange={(e) => setSearch(e.target.value)}
               />
             </label>
-            <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-white/[0.08] bg-black/20 p-1">
+            <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-ink/15 bg-surface-muted p-1">
               {['all', 'available', 'busy', 'offline'].map((status) => (
                 <button
                   key={status}
@@ -126,6 +191,36 @@ const Market = () => {
           </div>
         </div>
       </section>
+
+      {showShowcaseGpus && (
+        <section className="flex flex-col gap-4">
+          <div className="flex flex-col gap-1">
+            <h3 className="text-lg font-bold">GPU showcase</h3>
+            <p className="text-sm text-text-dim">
+              Sample listings for exploring the marketplace. Jobs selected here are sent to your registered GPU
+              {myGpu ? ` (${myGpu.model}, ${myGpu.vram} GB)` : ''}.
+            </p>
+          </div>
+          {filteredShowcaseGpus.length > 0 ? (
+            <div className="grid grid-cols-[repeat(auto-fill,minmax(min(100%,280px),1fr))] gap-4">
+              {filteredShowcaseGpus.map((gpu) => (
+                <GpuCard
+                  key={gpu._id}
+                  gpu={{ ...gpu, status: 'available', host: { name: 'ComputeGrid showcase' } }}
+                  isShowcase
+                  canDeploy={myGpuOnline}
+                  unavailableReason={showcaseUnavailableReason}
+                  onDeploy={() => setSelectedGpu({ ...gpu, executionGpu: myGpu })}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="glass-card py-8 text-center text-sm text-text-dim">
+              No showcase GPUs match “{search}”.
+            </div>
+          )}
+        </section>
+      )}
 
       {!loading && !error && gpus.length > 0 && (
         <div className="flex items-center justify-between">
@@ -148,7 +243,7 @@ const Market = () => {
       ) : gpus.length === 0 ? (
         <div className="glass-card flex flex-col items-center justify-center gap-3 py-16 text-center text-text-dim">
           <Cpu size={32} className="text-primary/60" />
-          <span className="text-sm">No GPUs currently available in the network.</span>
+          <span className="text-sm">No community GPUs are currently listed. Try a showcase GPU above.</span>
         </div>
       ) : filteredGpus.length === 0 ? (
         <div className="glass-card flex flex-col items-center justify-center gap-3 py-16 text-center text-text-dim">
@@ -173,7 +268,10 @@ const Market = () => {
       <AnimatePresence>
         {selectedGpu && (
           <JobLaunchModal
-            gpu={selectedGpu}
+          gpu={selectedGpu.executionGpu
+            ? { ...selectedGpu.executionGpu, vram: selectedGpu.executionGpu.maxVram || selectedGpu.executionGpu.vram }
+            : selectedGpu}
+            showcaseGpu={selectedGpu.executionGpu ? selectedGpu : null}
             onClose={() => setSelectedGpu(null)}
             onSuccess={() => navigate('/jobs')}
           />

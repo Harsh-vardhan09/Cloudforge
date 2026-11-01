@@ -67,11 +67,184 @@ async function callLLMIfAvailable(systemPrompt, userPrompt) {
 }
 
 // Built-in Intelligent Job Assistant Engine
-function generateJobAssistantLocal(prompt, gpuModel, gpuVram) {
-  const p = (prompt || "").toLowerCase();
+function generateJobAssistantLocal({
+  prompt = "",
+  gpuModel = "NVIDIA GPU",
+  gpuVram = 8,
+  currentCommand = "",
+  currentImage = "",
+  scriptName = "",
+  scriptContent = "",
+} = {}) {
+  const p = (prompt || currentCommand || scriptName || "").toLowerCase();
   const vram = parseFloat(gpuVram) || 8;
 
-  // 1. PyTorch Training / CNN / MNIST
+  // 1. Cooperative Checkpointing Injection / Interruption-proof
+  if (
+    !scriptContent &&
+    (
+      p.includes("checkpoint") ||
+      p.includes("resume") ||
+      p.includes("interrupt") ||
+      p.includes("preempt") ||
+      p.includes("save") ||
+      p.includes("persist") ||
+      p.includes("resilience")
+    )
+  ) {
+    const checkpointScript = `import os
+import json
+import time
+import torch
+import torch.nn as nn
+import torch.optim as optim
+
+# ==========================================
+# IdleLab Cooperative Checkpointing Hooks
+# ==========================================
+checkpoint_dir = os.environ.get("CHECKPOINT_DIR", "/workspace/checkpoints")
+os.makedirs(checkpoint_dir, exist_ok=True)
+resume = os.environ.get("RESUME_FROM_CHECKPOINT", "false").lower() == "true"
+start_step = int(os.environ.get("CHECKPOINT_STEP", "0"))
+
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"==> IdleLab Node Active | Device: {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
+
+class ResilientModel(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.net = nn.Sequential(
+            nn.Linear(512, 256),
+            nn.ReLU(),
+            nn.Linear(256, 64),
+            nn.ReLU(),
+            nn.Linear(64, 10)
+        )
+    def forward(self, x):
+        return self.net(x)
+
+model = ResilientModel().to(device)
+optimizer = optim.Adam(model.parameters(), lr=1e-3)
+checkpoint_file = os.path.join(checkpoint_dir, "model_checkpoint.pt")
+
+if resume and os.path.exists(checkpoint_file):
+    print(f"==> Resuming from host preemption at checkpoint step {start_step}...")
+    ckpt = torch.load(checkpoint_file, map_location=device)
+    model.load_state_dict(ckpt["model_state"])
+    optimizer.load_state_dict(ckpt["optimizer_state"])
+    print(f"==> State restored successfully! Continuing compute workload.")
+
+total_steps = 30
+print(f"==> Executing training steps {start_step + 1} to {total_steps}...")
+
+for step in range(start_step + 1, total_steps + 1):
+    x = torch.randn(64, 512, device=device)
+    y = torch.randint(0, 10, (64,), device=device)
+    loss = nn.functional.cross_entropy(model(x), y)
+    optimizer.zero_grad()
+    loss.backward()
+    optimizer.step()
+
+    print(f"Step {step:02d}/{total_steps} | Loss: {loss.item():.4f} | VRAM: {torch.cuda.memory_allocated()/(1024**2):.1f}MB")
+    time.sleep(0.3)
+
+    # Periodic checkpoint save (every 5 steps) - ensures migration without progress loss
+    if step % 5 == 0 or step == total_steps:
+        torch.save({
+            "step": step,
+            "model_state": model.state_dict(),
+            "optimizer_state": optimizer.state_dict(),
+        }, checkpoint_file)
+        with open(os.path.join(checkpoint_dir, "checkpoint.json"), "w") as f:
+            json.dump({"step": step, "totalSteps": total_steps}, f)
+        print(f"==> [Checkpoint Snapshot] Step {step}/{total_steps} committed to storage.")
+
+print("==> Workload successfully finished with full cooperative checkpoint support!")
+`;
+
+    return {
+      dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
+      command: "python /workspace/train_checkpoint.py",
+      vramRequired: Math.min(vram, 4),
+      checkpointSupported: true,
+      suggestedScriptName: "train_checkpoint.py",
+      suggestedScript: checkpointScript,
+      explanation: "Generated an interruption-proof PyTorch workload configured with IdleLab cooperative checkpointing. Reads CHECKPOINT_DIR and writes atomic model weights + checkpoint.json so your job survives host reclaims without lost time.",
+      suggestedEnv: {
+        PYTHONUNBUFFERED: "1",
+        CUDA_VISIBLE_DEVICES: "0",
+      },
+      optimizations: [
+        "Periodically saves weights and checkpoint.json to os.environ['CHECKPOINT_DIR']",
+        "Automatically checks RESUME_FROM_CHECKPOINT on startup to recover training state",
+        "Coordinates with the platform's 60-second periodic snapshot daemon",
+      ],
+    };
+  }
+
+  // 2. Jupyter Notebook (.ipynb) Support
+  if (
+    p.includes("notebook") ||
+    p.includes("ipynb") ||
+    (scriptName && scriptName.toLowerCase().endsWith(".ipynb"))
+  ) {
+    const targetNb = scriptName || "notebook.ipynb";
+    return {
+      dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
+      command: `(jupyter nbconvert --to notebook --execute /workspace/${targetNb} --output /workspace/output_${targetNb} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${targetNb}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${targetNb}'); print('=== Notebook executed successfully ===')")`,
+      vramRequired: Math.min(vram, 6),
+      checkpointSupported: false,
+      suggestedScriptName: targetNb,
+      explanation: "Configured headless Jupyter Notebook (.ipynb) execution pipeline. Compiles notebook cells sequentially, executes tensor calculations on GPU, and writes results and plots to output notebook.",
+      suggestedEnv: {
+        PYTHONUNBUFFERED: "1",
+        CUDA_VISIBLE_DEVICES: "0",
+      },
+      optimizations: [
+        "Uses nbconvert to execute cells sequentially in non-interactive headless mode",
+        "Saves rendered output cells, tables, and images back into output notebook file",
+        "Automatic fallback installs nbconvert and ipykernel on-the-fly if missing",
+      ],
+    };
+  }
+
+  // 3. User Provided Script Analysis & Enhancement
+  if (scriptContent && scriptContent.trim().length > 0) {
+    const hasCudaCheck = scriptContent.includes("cuda.is_available");
+    const hasCheckpointWrites =
+      scriptContent.includes("CHECKPOINT_DIR") &&
+      (scriptContent.includes("torch.save") || scriptContent.includes("save_pretrained"));
+    const hasCheckpointResume =
+      scriptContent.includes("RESUME_FROM_CHECKPOINT") &&
+      (scriptContent.includes("torch.load") || scriptContent.includes("from_pretrained"));
+    const hasCheckpoints = hasCheckpointWrites && hasCheckpointResume;
+
+    return {
+      dockerImage: currentImage || "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
+      command: currentCommand || `python /workspace/${scriptName || "script.py"}`,
+      vramRequired: Math.min(vram, 6),
+      batchSize: vram >= 16 ? 64 : vram >= 8 ? 32 : 8,
+      checkpointSupported: hasCheckpoints,
+      checkpointPlan: hasCheckpoints
+        ? "The script saves and restores model state under CHECKPOINT_DIR."
+        : "This script does not implement both checkpoint saving and restore. The local rules engine cannot safely rewrite an arbitrary training loop.",
+      suggestedScriptName: scriptName || "script.py",
+      ...(hasCheckpoints ? { suggestedScript: scriptContent } : {}),
+      explanation: `Analyzed uploaded script '${scriptName || "script.py"}'. ${hasCudaCheck ? "Found a CUDA availability check." : "Could not confirm a CUDA availability check."} ${hasCheckpoints ? "Checkpoint save and restore logic was found." : "Review the checkpoint limitation before submitting."}`,
+      suggestedEnv: {
+        PYTHONUNBUFFERED: "1",
+        CUDA_VISIBLE_DEVICES: "0",
+        BATCH_SIZE: String(vram >= 16 ? 64 : vram >= 8 ? 32 : 8),
+      },
+      optimizations: [
+        hasCudaCheck ? "CUDA availability check found in the script" : "Verify torch.cuda.is_available() when the container starts",
+        "Suggested batch size is provided as BATCH_SIZE; the script must read it to change training batches",
+        hasCheckpoints ? "Script saves and restores checkpoints" : "Add model and optimizer save/restore calls to make this script resumable",
+      ],
+    };
+  }
+
+  // 4. PyTorch Training / CNN / MNIST
   if (p.includes("train") || p.includes("mnist") || p.includes("cnn") || p.includes("cifar") || p.includes("resnet")) {
     return {
       dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
@@ -119,6 +292,9 @@ for step in range(1, 11):
 print('==> Training completed successfully on GPU!')
 "`,
       vramRequired: Math.min(vram, 4),
+      batchSize: 64,
+      checkpointSupported: false,
+      checkpointPlan: "No checkpoint save and restore code is included in this generated benchmark.",
       explanation: "Generated a robust PyTorch CNN training pipeline running directly on CUDA with automated batch latency measurements and synthetic GPU memory utilization.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -132,7 +308,7 @@ print('==> Training completed successfully on GPU!')
     };
   }
 
-  // 2. Whisper / Audio transcription
+  // 5. Whisper / Audio transcription
   if (p.includes("whisper") || p.includes("audio") || p.includes("transcri")) {
     return {
       dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
@@ -150,6 +326,9 @@ print(f'==> Whisper model loaded on {device}. Model parameter count: {sum(p.nume
 print('==> Audio pipeline ready for batch inference!')
 "`,
       vramRequired: Math.min(vram, 6),
+      batchSize: vram >= 16 ? 64 : vram >= 8 ? 32 : 8,
+      checkpointSupported: false,
+      checkpointPlan: "This workload does not include model checkpoint save and restore code.",
       explanation: "Configured OpenAI Whisper environment with automatic pip installation and base model initialization directly onto GPU memory.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -161,7 +340,7 @@ print('==> Audio pipeline ready for batch inference!')
     };
   }
 
-  // 3. Stable Diffusion / Image generation
+  // 6. Stable Diffusion / Image generation
   if (p.includes("diffusion") || p.includes("image") || p.includes("art") || p.includes("sd")) {
     return {
       dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
@@ -176,6 +355,7 @@ print(f'==> Latent tensor shape: {c.shape}, memory allocated: {torch.cuda.memory
 print('==> Ready for diffusers inference pipeline!')
 "`,
       vramRequired: Math.min(vram, 8),
+      checkpointSupported: false,
       explanation: "Sets up float16 tensor operations suitable for Stable Diffusion pipelines with low memory overhead.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -188,7 +368,7 @@ print('==> Ready for diffusers inference pipeline!')
     };
   }
 
-  // 4. LLaMA / Mistral / LLM Inference / Transformers
+  // 7. LLaMA / Mistral / LLM Inference / Transformers
   if (p.includes("llama") || p.includes("llm") || p.includes("transformer") || p.includes("huggingface") || p.includes("text")) {
     return {
       dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
@@ -209,6 +389,7 @@ print(f'==> Tokens generated: {tokens}')
 print('==> LLM Transformer stack initialized and ready!')
 "`,
       vramRequired: Math.min(vram, 8),
+      checkpointSupported: false,
       explanation: "Sets up HuggingFace Transformers and Accelerate with CUDA acceleration and tokenization checks.",
       suggestedEnv: {
         PYTHONUNBUFFERED: "1",
@@ -221,7 +402,7 @@ print('==> LLM Transformer stack initialized and ready!')
     };
   }
 
-  // Default / Benchmark / CUDA Stress test
+  // 8. Default / Benchmark / CUDA Stress test
   return {
     dockerImage: "pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime",
     command: `python -c "
@@ -256,15 +437,16 @@ print(f'==> Compute speed: {tflops:.2f} TFLOPs (avg time: {total_time*1000:.2f}m
 print('==> Benchmark finished with 0 errors.')
 "`,
     vramRequired: Math.min(vram, 4),
+    checkpointSupported: false,
     explanation: "High-performance FP32 matrix multiplication stress test benchmarking raw CUDA TFLOP compute capacity and VRAM bandwidth.",
     suggestedEnv: {
       PYTHONUNBUFFERED: "1",
       CUDA_VISIBLE_DEVICES: "0",
     },
     optimizations: [
-        "Performs a warmup multiplication to initialize CUDA context",
-        "Uses torch.cuda.synchronize() to measure true GPU computation time",
-        "Safe memory footprint (~1.2 GB VRAM for 8192x8192 matrices)",
+      "Performs a warmup multiplication to initialize CUDA context",
+      "Uses torch.cuda.synchronize() to measure true GPU computation time",
+      "Safe memory footprint (~1.2 GB VRAM for 8192x8192 matrices)",
     ],
   };
 }
@@ -433,46 +615,156 @@ function analyzeFailureLocal(logs = [], command = "", dockerImage = "", exitCode
 
 /**
  * POST /api/ai/assistant
- * Input: { prompt, gpuModel, gpuVram, currentCommand, currentImage }
+ * Input: { prompt, gpuModel, gpuVram, currentCommand, currentImage, scriptName, scriptContent, datasetName }
  */
 export const aiJobAssistant = async (req, res, next) => {
   try {
-    const { prompt, gpuModel, gpuVram, currentCommand, currentImage } = req.body;
+    const {
+      prompt,
+      gpuModel,
+      gpuVram,
+      currentCommand,
+      currentImage,
+      scriptName,
+      scriptContent,
+      datasetName,
+    } = req.body;
 
-    if (!prompt && !currentCommand) {
-      return res.status(400).json({ message: "Either a prompt or currentCommand is required" });
+    if (typeof prompt !== "string" || !prompt.trim()) {
+      return res.status(400).json({ message: "Describe the workload you want to run" });
+    }
+    if (
+      datasetName &&
+      (typeof datasetName !== "string" ||
+        !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(datasetName))
+    ) {
+      return res.status(400).json({ message: "Provide a valid dataset filename" });
     }
 
     // Try calling external LLM first if configured
-    const systemPrompt = `You are an expert GPU Infrastructure and Cloud ML Engineer.
-Given a user's task description and target GPU specifications, output a JSON object with:
+    const systemPrompt = `You are an expert GPU Infrastructure and Cloud ML Engineer for IdleLab (decentralized campus GPU compute network).
+Given a user's task description, script content (if provided), and target GPU specifications, output a JSON object with:
 - dockerImage: Recommended Docker image (e.g. pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime, tensorflow/tensorflow:latest-gpu, etc.)
 - command: Complete, runnable bash or python command that executes the task with CUDA validation
 - vramRequired: Recommended VRAM in GB (float/int)
-- explanation: Clear rationale for image, memory, and runtime flags
-- suggestedEnv: Object containing recommended environment variables (e.g. CUDA_VISIBLE_DEVICES)
-- optimizations: Array of 3 key tips to ensure the script runs reliably on this GPU.`;
+- batchSize: Conservative recommended integer batch size for this GPU
+- checkpointPlan: Explain whether the returned script actually saves and restores model/optimizer state under CHECKPOINT_DIR
+- explanation: Clear rationale for image, memory, runtime flags, and checkpointing strategy
+- suggestedEnv: Object containing recommended environment variables (e.g. PYTHONUNBUFFERED: "1", CUDA_VISIBLE_DEVICES: "0")
+- optimizations: Array of 3 key tips to ensure the script runs reliably on this GPU
+- suggestedScript: (optional) Updated or generated runnable Python script. For an uploaded script, preserve its behavior and integrate checkpoint saving AND loading instead of only adding headers
+- suggestedScriptName: (optional) filename for suggestedScript (e.g. train_checkpoint.py)
+- checkpointSupported: boolean true only if the returned script actually saves and restores workload state.`;
 
     const userPrompt = `Target GPU: ${gpuModel || "NVIDIA GPU"} with ${gpuVram || 8} GB VRAM.
-User Goal / Task: ${prompt || "Analyze and optimize current command"}
+User Goal / Task: ${prompt || "Analyze and optimize current workload"}
 Current Command: ${currentCommand || "None"}
 Current Docker Image: ${currentImage || "None"}
+Script Name: ${scriptName || "None"}
+Script Content Preview: ${scriptContent ? scriptContent.slice(0, 2000) : "None"}
+Dataset File: ${datasetName || "None"}${datasetName ? ` (available at /workspace/data/${datasetName})` : ""}
+When a dataset is attached, use that file rather than synthetic data. If its schema is unknown, state the assumptions and do not claim the generated workload trains on it unless the script actually reads it.
 
 Return pure JSON matching the schema.`;
 
     const llmResult = await callLLMIfAvailable(systemPrompt, userPrompt);
-    if (llmResult && llmResult.command && llmResult.dockerImage) {
+    if (
+      llmResult &&
+      typeof llmResult.command === "string" &&
+      typeof llmResult.dockerImage === "string" &&
+      (!llmResult.suggestedScript || typeof llmResult.suggestedScript === "string")
+    ) {
+      const availableVram = Number(gpuVram) || 8;
+      const batchSize = Number.isInteger(llmResult.batchSize) && llmResult.batchSize > 0
+        ? llmResult.batchSize
+        : availableVram >= 16 ? 64 : availableVram >= 8 ? 32 : 8;
+      const datasetPath = datasetName ? `/workspace/data/${datasetName}` : "";
+      const activeScript = llmResult.suggestedScript || scriptContent || "";
+      const datasetReferenceText = `${activeScript}\n${llmResult.command || ""}`.toLowerCase();
+      const llmEnv = llmResult.suggestedEnv &&
+        typeof llmResult.suggestedEnv === "object" &&
+        !Array.isArray(llmResult.suggestedEnv)
+        ? llmResult.suggestedEnv
+        : {};
+      const datasetUsed = Boolean(
+        datasetName &&
+        (datasetReferenceText.includes(datasetName.toLowerCase()) ||
+          datasetReferenceText.includes("dataset_path") ||
+          datasetReferenceText.includes("/workspace/data/"))
+      );
+      const checkpointSupported = Boolean(
+        activeScript &&
+        activeScript.includes("CHECKPOINT_DIR") &&
+        (activeScript.includes("torch.save") || activeScript.includes("save_pretrained")) &&
+        activeScript.includes("RESUME_FROM_CHECKPOINT") &&
+        (activeScript.includes("torch.load") || activeScript.includes("from_pretrained"))
+      );
       return res.json({
         source: "llm",
         ...llmResult,
+        batchSize,
+        checkpointSupported,
+        checkpointPlan: checkpointSupported
+          ? "The script to be run includes checkpoint save and restore logic."
+          : "Could not verify checkpoint save and restore logic in the script to be run.",
+        datasetUsed,
+        datasetPlan: datasetName
+          ? datasetUsed
+            ? `The returned script references the uploaded dataset (${datasetName}).`
+            : `The dataset is mounted at ${datasetPath}, but the returned script does not reference it. Review or edit the script before submitting.`
+          : "",
+        suggestedEnv: {
+          ...llmEnv,
+          BATCH_SIZE: String(batchSize),
+          ...(datasetPath ? { DATASET_PATH: datasetPath } : {}),
+        },
+        datasetPath,
       });
     }
 
     // Fallback to our high-quality local generator
-    const localResult = generateJobAssistantLocal(prompt || currentCommand, gpuModel, gpuVram);
+    const localResult = generateJobAssistantLocal({
+      prompt: prompt || currentCommand,
+      gpuModel,
+      gpuVram,
+      currentCommand,
+      currentImage,
+      scriptName,
+      scriptContent,
+    });
+    const availableVram = Number(gpuVram) || 8;
+    const batchSize = Number.isInteger(localResult.batchSize) && localResult.batchSize > 0
+      ? localResult.batchSize
+      : availableVram >= 16 ? 64 : availableVram >= 8 ? 32 : 8;
+    const datasetPath = datasetName ? `/workspace/data/${datasetName}` : "";
+    const activeScript = localResult.suggestedScript || scriptContent || "";
+    const datasetReferenceText = `${activeScript}\n${localResult.command || ""}`.toLowerCase();
+    const datasetUsed = Boolean(
+      datasetName &&
+      (datasetReferenceText.includes(datasetName.toLowerCase()) ||
+        datasetReferenceText.includes("dataset_path") ||
+        datasetReferenceText.includes("/workspace/data/"))
+    );
     return res.json({
       source: "local-engine",
       ...localResult,
+      batchSize,
+      checkpointPlan: localResult.checkpointPlan ||
+        (localResult.checkpointSupported
+          ? "The script to be run includes checkpoint save and restore logic."
+          : "This recommendation does not include checkpoint save and restore logic."),
+      datasetUsed,
+      datasetPlan: datasetName
+        ? datasetUsed
+          ? `The returned script references the uploaded dataset (${datasetName}).`
+          : `The dataset is mounted at ${datasetPath}, but local rules did not generate code to read it. Add a script or configure a hosted AI provider before submitting a real training workload.`
+        : "",
+      suggestedEnv: {
+        ...(localResult.suggestedEnv || {}),
+        BATCH_SIZE: String(batchSize),
+        ...(datasetPath ? { DATASET_PATH: datasetPath } : {}),
+      },
+      datasetPath,
     });
   } catch (error) {
     logger.error(`AI Assistant error: ${error.message}`);

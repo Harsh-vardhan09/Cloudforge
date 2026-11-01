@@ -23,44 +23,75 @@ import {
 const INPUT_CONTENT_TYPES = {
   ".py": "text/x-python",
   ".sh": "text/x-shellscript",
+  ".ipynb": "application/x-ipynb+json",
+};
+const DATASET_CONTENT_TYPES = {
+  ".csv": "text/csv",
+  ".json": "application/json",
+  ".jsonl": "application/x-ndjson",
+  ".txt": "text/plain",
+  ".zip": "application/zip",
+  ".tar": "application/x-tar",
+  ".tar.gz": "application/gzip",
+  ".npy": "application/octet-stream",
+  ".npz": "application/octet-stream",
+  ".parquet": "application/vnd.apache.parquet",
 };
 
 export const createInputUploadUrl = async (req, res, next) => {
-  const { fileName, size } = req.body;
+  const { fileName, size, kind = "script" } = req.body;
   if (
     typeof fileName !== "string" ||
     !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(fileName) ||
     !Number.isInteger(size) ||
     size < 1 ||
-    size > MAX_INPUT_BYTES
+    size > MAX_INPUT_BYTES ||
+    !["script", "dataset"].includes(kind)
   ) {
-    return res.status(400).json({ message: "Provide a valid script filename and a file size up to 50 MB" });
+    return res.status(400).json({ message: "Provide a valid script or dataset filename and a file size up to 50 MB" });
   }
 
-  const extension = fileName.slice(fileName.lastIndexOf(".")).toLowerCase();
-  const contentType = INPUT_CONTENT_TYPES[extension];
+  const lowerFileName = fileName.toLowerCase();
+  const supportedTypes = kind === "script" ? INPUT_CONTENT_TYPES : DATASET_CONTENT_TYPES;
+  const extension = Object.keys(supportedTypes).find((candidate) => lowerFileName.endsWith(candidate));
+  const contentType = extension ? supportedTypes[extension] : null;
   if (!contentType) {
-    return res.status(400).json({ message: "Only Python (.py) and shell (.sh) scripts are supported" });
+    return res.status(400).json({
+      message: kind === "script"
+        ? "Only Python (.py), shell (.sh), and Jupyter Notebook (.ipynb) files are supported"
+        : "Unsupported dataset file type",
+    });
   }
 
   try {
-    const key = `jobs/${req.user.id}/uploads/${randomUUID()}/${fileName}`;
+    const key = `jobs/${req.user.id}/uploads/${kind}/${randomUUID()}/${fileName}`;
     const upload = await createInputUpload({ key, contentType });
     res.json({
       ...upload,
       objectKey: key,
       contentType,
+      kind,
       expiresIn: STORAGE_URL_EXPIRY_SECONDS,
+      storageAvailable: true,
     });
   } catch (error) {
-    next(error);
+    logger.error(`Could not create S3 upload request: ${error.message}`);
+    res.status(503).json({
+      message: "S3 script storage is unavailable. Configure the object storage bucket and credentials, then try again.",
+    });
   }
 };
 
 import User from "../models/user.model.js";
 
-// POST /api/jobs — user submits a job or uploads a script
+// POST /api/jobs — user submits a job or uploads a script/notebook
 export const postJob = async (req, res, next) => {
+  if (typeof req.body.scriptContent === "string" && req.body.scriptContent.length > 0) {
+    return res.status(400).json({
+      message: "Direct script content is no longer accepted. Upload scripts to S3 before submitting the job.",
+    });
+  }
+
   try {
     const user = await User.findById(req.user.id);
     if (!user || user.creditBalance <= 0) {
@@ -70,8 +101,19 @@ export const postJob = async (req, res, next) => {
     return next(err);
   }
 
-  const { dockerImage, command, vramRequired, env, gpuId, scriptName, inputObjectKey } = req.body;
+  const {
+    dockerImage,
+    command,
+    vramRequired,
+    env,
+    gpuId,
+    scriptName,
+    inputObjectKey,
+    datasetName,
+    datasetObjectKey,
+  } = req.body;
   const hasScript = Boolean(scriptName || inputObjectKey);
+  const hasDataset = Boolean(datasetName || datasetObjectKey);
 
   if (
     scriptName &&
@@ -80,14 +122,18 @@ export const postJob = async (req, res, next) => {
         scriptName.toLowerCase().endsWith(extension)
       ))
   ) {
-    return res.status(400).json({ message: "Only valid Python (.py) and shell (.sh) script names are supported" });
+    return res.status(400).json({ message: "Only valid Python (.py), shell (.sh), and Jupyter Notebook (.ipynb) files are supported" });
   }
 
-  // Derive default command if a script file was uploaded
+  // Derive default command if a script file or notebook was uploaded
   let finalCommand = command;
   if (!finalCommand && scriptName) {
-    if (scriptName.toLowerCase().endsWith(".sh")) {
+    const lowerName = scriptName.toLowerCase();
+    if (lowerName.endsWith(".sh")) {
       finalCommand = `bash /workspace/${scriptName}`;
+    } else if (lowerName.endsWith(".ipynb")) {
+      // Execute Jupyter Notebook with output preservation and pip fallback
+      finalCommand = `(jupyter nbconvert --to notebook --execute /workspace/${scriptName} --output /workspace/output_${scriptName} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${scriptName}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${scriptName}'); print('=== Notebook executed successfully ===')")`;
     } else {
       finalCommand = `python /workspace/${scriptName}`;
     }
@@ -102,7 +148,7 @@ export const postJob = async (req, res, next) => {
     });
   }
   if (hasScript && (!scriptName || !inputObjectKey)) {
-    return res.status(400).json({ message: "Upload the script before submitting the job" });
+    return res.status(400).json({ message: "Upload the script to S3 before submitting the job" });
   }
   if (
     inputObjectKey &&
@@ -112,11 +158,76 @@ export const postJob = async (req, res, next) => {
   ) {
     return res.status(403).json({ message: "Input file does not belong to this user" });
   }
+  if (inputObjectKey && !scriptName) {
+    return res.status(400).json({ message: "A filename is required for an S3 script upload" });
+  }
+  if (
+    hasDataset &&
+    (!datasetName ||
+      !/^[A-Za-z0-9][A-Za-z0-9._-]{0,127}$/.test(datasetName) ||
+      !datasetObjectKey ||
+      !Object.keys(DATASET_CONTENT_TYPES).some((extension) => datasetName.toLowerCase().endsWith(extension)))
+  ) {
+    return res.status(400).json({ message: "Upload one supported dataset file before submitting the job" });
+  }
+  if (
+    datasetObjectKey &&
+    (typeof datasetObjectKey !== "string" ||
+      !datasetObjectKey.startsWith(`jobs/${req.user.id}/uploads/dataset/`) ||
+      !datasetObjectKey.endsWith(`/${datasetName}`))
+  ) {
+    return res.status(403).json({ message: "Dataset file does not belong to this user" });
+  }
 
   try {
+    if (inputObjectKey) {
+      let metadata;
+      try {
+        metadata = await getObjectMetadata(inputObjectKey);
+      } catch (error) {
+        logger.warn(`Could not verify uploaded script in S3: ${error.message}`);
+        return res.status(502).json({ message: "Could not verify the script upload in S3. Please upload it again." });
+      }
+
+      const expectedContentType = INPUT_CONTENT_TYPES[
+        scriptName.slice(scriptName.lastIndexOf(".")).toLowerCase()
+      ];
+      if (
+        !Number.isInteger(metadata.contentLength) ||
+        metadata.contentLength < 1 ||
+        metadata.contentLength > MAX_INPUT_BYTES ||
+        metadata.contentType !== expectedContentType
+      ) {
+        return res.status(400).json({ message: "The S3 script upload is incomplete or has an invalid content type" });
+      }
+    }
+    if (datasetObjectKey) {
+      let metadata;
+      try {
+        metadata = await getObjectMetadata(datasetObjectKey);
+      } catch (error) {
+        logger.warn(`Could not verify uploaded dataset in S3: ${error.message}`);
+        return res.status(502).json({ message: "Could not verify the dataset upload in S3. Please upload it again." });
+      }
+
+      const datasetExtension = Object.keys(DATASET_CONTENT_TYPES)
+        .find((extension) => datasetName.toLowerCase().endsWith(extension));
+      if (
+        !Number.isInteger(metadata.contentLength) ||
+        metadata.contentLength < 1 ||
+        metadata.contentLength > MAX_INPUT_BYTES ||
+        metadata.contentType !== DATASET_CONTENT_TYPES[datasetExtension]
+      ) {
+        return res.status(400).json({ message: "The S3 dataset upload is incomplete or has an invalid content type" });
+      }
+    }
+
     const initialLogs = [];
     if (scriptName) {
-      initialLogs.push(`[upload] Script '${scriptName}' stored for the GPU agent to download`);
+      initialLogs.push(`[upload] Script '${scriptName}' stored in S3 for the GPU agent to download`);
+    }
+    if (datasetName) {
+      initialLogs.push(`[upload] Dataset '${datasetName}' stored in S3 for the GPU agent to download`);
     }
     initialLogs.push(`[queue] 📥 Job created in QUEUED status`);
 
@@ -130,6 +241,8 @@ export const postJob = async (req, res, next) => {
       env: env || {},
       scriptName: scriptName || "",
       inputObjectKey: inputObjectKey || "",
+      datasetName: datasetName || "",
+      datasetObjectKey: datasetObjectKey || "",
       status: "queued",
       logs: initialLogs,
     });
@@ -294,6 +407,7 @@ export const claimJob = async (req, res, next) => {
       }
 
       let inputDownloadUrl = null;
+      let datasetDownloadUrl = null;
       let checkpointDownloadUrl = null;
       let legacyScriptContent = "";
       try {
@@ -302,15 +416,28 @@ export const claimJob = async (req, res, next) => {
             job.inputObjectKey,
             job.scriptName || "input"
           );
-        } else if (job.scriptName) {
+        }
+        if (job.datasetObjectKey) {
+          datasetDownloadUrl = await createObjectDownloadUrl(
+            job.datasetObjectKey,
+            job.datasetName || "dataset"
+          );
+        }
+
+        if (!inputDownloadUrl && job.scriptName) {
           const legacyJob = await Job.findById(job._id).select("+scriptContent");
           legacyScriptContent = legacyJob?.scriptContent || "";
         }
+
         if (job.checkpointData?.objectKey) {
-          checkpointDownloadUrl = await createObjectDownloadUrl(
-            job.checkpointData.objectKey,
-            "checkpoint.zip"
-          );
+          try {
+            checkpointDownloadUrl = await createObjectDownloadUrl(
+              job.checkpointData.objectKey,
+              "checkpoint.zip"
+            );
+          } catch (storageErr) {
+            logger.warn(`Could not prepare checkpoint download URL: ${storageErr.message}`);
+          }
         }
       } catch (error) {
         await Job.updateOne(
@@ -374,9 +501,12 @@ export const claimJob = async (req, res, next) => {
           vramRequired: job.vramRequired,
           env: job.env instanceof Map ? Object.fromEntries(job.env) : job.env,
           scriptName: job.scriptName,
+          datasetName: job.datasetName,
           legacyScriptContent,
+          scriptContent: legacyScriptContent,
         },
         inputDownloadUrl,
+        datasetDownloadUrl,
         checkpointDownloadUrl,
         checkpointSequence: job.checkpointData?.sequence || 0,
         checkpointStep: job.checkpointData?.step || 0,
@@ -1359,4 +1489,3 @@ export const getJobMigration = async (req, res, next) => {
     next(error);
   }
 };
-

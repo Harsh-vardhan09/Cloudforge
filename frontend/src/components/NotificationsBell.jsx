@@ -93,7 +93,7 @@ const NotificationsBell = () => {
         onClick={() => setOpen((value) => !value)}
         aria-label={`Notifications${unreadCount ? `, ${unreadCount} unread` : ""}`}
         aria-expanded={open}
-        className="app-icon-button relative flex h-10 w-10 items-center justify-center rounded-xl border border-white/10 bg-white/5 text-text-dim hover:bg-white/10 hover:text-white"
+        className="app-icon-button relative flex h-10 w-10 items-center justify-center rounded-xl border border-ink/15 bg-white/5 text-text-dim hover:bg-white/10 hover:text-white"
       >
         <Bell size={18} />
         {unreadCount > 0 && (
@@ -104,8 +104,8 @@ const NotificationsBell = () => {
       </button>
 
       {open && (
-        <div className="absolute right-0 top-12 z-[200] w-[min(24rem,90vw)] overflow-hidden rounded-2xl border border-white/10 bg-[#0d1117] shadow-2xl">
-          <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
+        <div className="absolute right-0 top-12 z-[200] w-[min(24rem,90vw)] overflow-hidden rounded-2xl border border-ink/15 bg-surface shadow-2xl">
+          <div className="flex items-center justify-between border-b border-ink/15 px-4 py-3">
             <div>
               <h2 className="text-sm font-bold text-white">Notifications</h2>
               <p className="text-[11px] text-text-dim">{unreadCount} unread</p>
@@ -127,7 +127,7 @@ const NotificationsBell = () => {
                 type="button"
                 key={notification._id}
                 onClick={() => markRead(notification)}
-                className={`block w-full border-b border-white/5 px-4 py-3 text-left hover:bg-white/5 ${notification.readAt ? "opacity-65" : ""}`}
+                className={`block w-full border-b border-ink/10 px-4 py-3 text-left hover:bg-white/5 ${notification.readAt ? "opacity-65" : ""}`}
               >
                 <span className="flex items-start justify-between gap-3">
                   <span className="text-xs font-semibold text-white">{notification.title}</span>

@@ -238,6 +238,8 @@ def run_docker_job(
     token: str = "",
     script_name: str = "",
     input_download_url: str = "",
+    dataset_name: str = "",
+    dataset_download_url: str = "",
     script_content: str = "",
     attempt: Optional[int] = None,
     checkpoint_download_url: str = "",
@@ -289,6 +291,7 @@ def run_docker_job(
             )
         output_dir = os.path.join(job_dir, "output")
         checkpoint_dir = os.path.join(job_dir, "checkpoints")
+        dataset_dir = os.path.join(job_dir, "data")
         os.makedirs(output_dir, exist_ok=True)
         os.makedirs(checkpoint_dir, exist_ok=True)
 
@@ -309,6 +312,19 @@ def run_docker_job(
                 raise ValueError("Invalid uploaded script filename")
             with open(script_path, "w", encoding="utf-8") as script_file:
                 script_file.write(script_content)
+
+        if dataset_download_url:
+            if not dataset_name or os.path.basename(dataset_name) != dataset_name:
+                raise ValueError("Invalid uploaded dataset filename")
+            os.makedirs(dataset_dir, exist_ok=True)
+            dataset_path = os.path.join(dataset_dir, dataset_name)
+            with requests.get(dataset_download_url, stream=True, timeout=(10, 120)) as response:
+                response.raise_for_status()
+                with open(dataset_path, "wb") as dataset_file:
+                    for chunk in response.iter_content(chunk_size=1024 * 1024):
+                        if chunk:
+                            dataset_file.write(chunk)
+            report_log(f"[agent] 📥 Downloaded dataset into /workspace/data/{dataset_name}")
 
         if checkpoint_download_url:
             _restore_checkpoint(checkpoint_download_url, checkpoint_dir)
@@ -345,6 +361,9 @@ def run_docker_job(
         container_env["JOB_ID"] = job_id
         container_env["OUTPUT_DIR"] = "/workspace/output"
         container_env["CHECKPOINT_DIR"] = "/workspace/checkpoints"
+        container_env["DATASET_DIR"] = "/workspace/data"
+        if dataset_download_url:
+            container_env["DATASET_PATH"] = f"/workspace/data/{dataset_name}"
         if checkpoint_download_url:
             container_env["RESUME_FROM_CHECKPOINT"] = "true"
             container_env["CHECKPOINT_STEP"] = str(checkpoint_step)

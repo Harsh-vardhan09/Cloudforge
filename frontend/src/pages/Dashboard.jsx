@@ -220,7 +220,7 @@ const Dashboard = () => {
                     </AreaChart>
                 </ResponsiveContainer>
             ) : (
-                <div className="h-full w-full flex items-center justify-center border border-white/5 rounded-2xl bg-white/[0.02]">
+                <div className="h-full w-full flex items-center justify-center border border-ink/10 rounded-2xl bg-white/[0.02]">
                     <p className="text-sm text-text-dim italic">Insufficient data to generate chart</p>
                 </div>
             )}
@@ -249,7 +249,7 @@ const Dashboard = () => {
 
              <button 
                onClick={() => navigate('/host')}
-               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-white/[0.08] hover:bg-white/[0.05]"
+               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-ink/15 hover:bg-white/[0.05]"
              >
                 <div className="w-8 h-8 rounded-lg bg-primary/20 text-primary flex items-center justify-center">
                    <Cpu size={18} />
@@ -261,7 +261,7 @@ const Dashboard = () => {
              </button>
              <button 
                onClick={() => navigate('/billing')}
-               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-white/[0.08] hover:bg-white/[0.05]"
+               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-ink/15 hover:bg-white/[0.05]"
              >
                 <div className="w-8 h-8 rounded-lg bg-secondary/20 text-secondary flex items-center justify-center">
                    <CreditCard size={18} />
@@ -273,7 +273,7 @@ const Dashboard = () => {
              </button>
              <button 
                onClick={() => navigate('/ai-sandbox')}
-               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-white/[0.08] hover:bg-white/[0.05]"
+               className="flex w-full items-center gap-3 rounded-xl border border-transparent bg-white/[0.025] p-3.5 text-left transition-all hover:border-ink/15 hover:bg-white/[0.05]"
              >
                 <div className="w-8 h-8 rounded-lg bg-white/10 text-white flex items-center justify-center">
                    <Play size={16} fill="currentColor" />

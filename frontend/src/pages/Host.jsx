@@ -47,11 +47,11 @@ const ReclaimModal = ({ job, gpu, onClose, onSuccess }) => {
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-lg bg-[#0d1117] rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[1002] border border-amber-500/30 overflow-hidden"
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-lg bg-surface rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(64,52,61,0.2)] z-[1002] border border-amber-500/30 overflow-hidden"
     >
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-amber-500 via-orange-500 to-primary" />
 
-      <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] border-b border-white/5">
+      <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] border-b border-ink/10">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-amber-500/20 text-amber-400 rounded-lg">
             <RotateCcw size={20} />
@@ -91,7 +91,7 @@ const ReclaimModal = ({ job, gpu, onClose, onSuccess }) => {
               </div>
             )}
 
-            <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col gap-2">
+            <div className="bg-white/[0.02] border border-ink/10 rounded-xl p-4 flex flex-col gap-2">
               <div className="flex justify-between text-xs">
                 <span className="text-text-dim">Your Hardware:</span>
                 <span className="font-bold text-white">{gpu?.model} ({gpu?.vram}GB)</span>
@@ -157,7 +157,7 @@ const ReclaimModal = ({ job, gpu, onClose, onSuccess }) => {
             </div>
 
             {stage === 2 && result && (
-              <div className="w-full bg-white/[0.02] border border-white/5 rounded-xl p-3 text-xs flex flex-col gap-1.5 text-left">
+              <div className="w-full bg-white/[0.02] border border-ink/10 rounded-xl p-3 text-xs flex flex-col gap-1.5 text-left">
                 <div className="flex justify-between">
                   <span className="text-text-dim">Reclaimed Node:</span>
                   <span className="text-success font-semibold">{result.reclaimedGpu?.model} (Scheduling paused)</span>
@@ -205,6 +205,7 @@ const Host = () => {
   const navigate = useNavigate();
   const { token } = useAuth();
   const [copied, setCopied] = useState(false);
+  const [tokenCopied, setTokenCopied] = useState(false);
   const [myGpu, setMyGpu] = useState(null);
   const [activeJob, setActiveJob] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -305,7 +306,7 @@ const Host = () => {
               Needs Python 3.11&ndash;3.13 and Docker running. An NVIDIA driver plus the
               Container Toolkit enables GPU jobs; without them the agent still runs CPU work.
             </p>
-            <div className="bg-black/40 p-4 rounded-xl border border-white/10 font-mono text-[0.8rem] relative">
+            <div className="bg-surface-muted p-4 rounded-xl border border-ink/15 font-mono text-[0.8rem] relative">
               <button
                 onClick={handleCopy}
                 className="absolute top-3 right-3 p-2 hover:bg-white/10 rounded-lg transition-all text-text-dim hover:text-white"
@@ -337,24 +338,29 @@ const Host = () => {
             <p className="text-[0.75rem] text-text-dim mb-4 leading-relaxed">
               Use this token manually if you are configuring the agent in <code className="text-accent font-bold">.env</code>.
             </p>
-            <div className="bg-black/20 p-3 rounded-lg border border-white/5 flex items-center gap-3">
+            <div className="bg-surface-muted p-3 rounded-lg border border-ink/10 flex items-center gap-3">
               <code className="text-[0.7rem] text-text-dim truncate flex-1">{token || 'Login to see token'}</code>
               <button
-                 onClick={() => { navigator.clipboard.writeText(token); alert('Token copied!'); }}
-                 className="p-1.5 hover:bg-white/5 rounded text-text-dim"
+                onClick={() => {
+                  navigator.clipboard.writeText(token);
+                  setTokenCopied(true);
+                  setTimeout(() => setTokenCopied(false), 2000);
+                }}
+                className="p-1.5 hover:bg-white/5 rounded text-text-dim hover:text-white transition-colors"
+                title="Copy personal access token"
               >
-                 <Copy size={14} />
+                {tokenCopied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
               </button>
             </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             <div className="p-6 glass-card border-white/5 flex flex-col gap-3">
+             <div className="p-6 glass-card border-ink/10 flex flex-col gap-3">
                 <Shield size={24} className="text-accent" />
                 <h4 className="font-bold text-sm">Secure Isolation</h4>
                 <p className="text-[0.7rem] text-text-dim">Jobs run in hardened Docker containers with zero host filesystem access.</p>
              </div>
-             <div className="p-6 glass-card border-white/5 flex flex-col gap-3">
+             <div className="p-6 glass-card border-ink/10 flex flex-col gap-3">
                 <Cpu size={24} className="text-secondary" />
                 <h4 className="font-bold text-sm">Instant Reclaim</h4>
                 <p className="text-[0.7rem] text-text-dim">Need your GPU back? Reclaim saves the latest checkpoint and pauses scheduling on this host.</p>
@@ -363,7 +369,7 @@ const Host = () => {
         </div>
 
         <div className="glass-card flex min-w-0 flex-col overflow-hidden">
-          <div className="p-6 bg-white/[0.03] border-b border-white/5 flex items-center justify-between">
+          <div className="p-6 bg-white/[0.03] border-b border-ink/10 flex items-center justify-between">
             <h3 className="font-bold">Active Host Metrics</h3>
             <span className={`px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-widest ${myGpu ? 'bg-success/10 text-success animate-pulse' : 'bg-white/10 text-text-dim'}`}>
               {myGpu ? myGpu.status : 'Offline'}
@@ -372,7 +378,7 @@ const Host = () => {
 
           {myGpu ? (
             <div className="p-8 flex flex-col gap-6">
-              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-ink/10">
                 <div className="p-3 bg-primary/20 rounded-lg text-primary">
                   <Cpu size={24} />
                 </div>
@@ -385,7 +391,7 @@ const Host = () => {
                            <div className="flex items-center gap-2">
                               <input
                                 type="number"
-                                className="bg-white/10 border border-white/10 px-2 py-1 rounded w-20 text-[0.7rem] font-bold text-secondary focus:outline-none"
+                                className="bg-white/10 border border-ink/15 px-2 py-1 rounded w-20 text-[0.7rem] font-bold text-secondary focus:outline-none"
                                 value={newVram}
                                 onChange={(e) => setNewVram(e.target.value)}
                               />
@@ -394,7 +400,7 @@ const Host = () => {
                         ) : (
                            <button
                              onClick={() => { setEditingVram(true); setNewVram(myGpu.maxVram || myGpu.vram); }}
-                             className="text-[0.6rem] text-text-dim border border-white/10 px-2 py-0.5 rounded hover:bg-white/5 transition-all"
+                             className="text-[0.6rem] text-text-dim border border-ink/15 px-2 py-0.5 rounded hover:bg-white/5 transition-all"
                            >
                               Limit to {myGpu.maxVram || myGpu.vram}GB
                            </button>
@@ -404,7 +410,7 @@ const Host = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-white/5">
+              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-ink/10">
                 <div className="p-3 bg-accent/20 rounded-lg text-accent">
                   <DollarSign size={24} />
                 </div>
@@ -415,7 +421,7 @@ const Host = () => {
                        <div className="flex items-center gap-2">
                           <input
                              type="number"
-                             className="bg-white/10 border border-white/10 px-2 py-1 rounded w-20 text-sm font-bold text-primary focus:outline-none focus:border-primary"
+                             className="bg-white/10 border border-ink/15 px-2 py-1 rounded w-20 text-sm font-bold text-primary focus:outline-none focus:border-primary"
                              value={newPrice}
                              onChange={(e) => setNewPrice(e.target.value)}
                              step="0.1"
@@ -464,7 +470,7 @@ const Host = () => {
                      </span>
                    </div>
 
-                   <div className="flex flex-col gap-1 bg-black/40 p-3 rounded-xl border border-white/5">
+                   <div className="flex flex-col gap-1 bg-surface-muted p-3 rounded-xl border border-ink/10">
                       <p className="text-xs font-mono text-white truncate">{activeJob.dockerImage}</p>
                       <p className="text-[0.65rem] text-text-dim">Customer: {activeJob.user?.name || 'Customer'}</p>
                    </div>
@@ -512,7 +518,8 @@ const Host = () => {
                 onClick={handleCopy}
                 className="text-xs font-bold text-primary hover:underline flex items-center gap-2"
               >
-                  <Download size={14} /> Download Agent Manual (.pdf)
+                  {copied ? <Check size={14} className="text-success" /> : <Copy size={14} />}
+                  {copied ? 'Setup script copied to clipboard!' : 'Copy Quick Setup script'}
               </button>
             </div>
           )}
@@ -527,7 +534,7 @@ const Host = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1001]"
+              className="fixed inset-0 bg-ink/30 backdrop-blur-md z-[1001]"
               onClick={() => setShowReclaimModal(false)}
             />
             <ReclaimModal
