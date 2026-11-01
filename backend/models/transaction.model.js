@@ -9,6 +9,7 @@ const transactionSchema = new mongoose.Schema({
   razorpayOrderId: { type: String },
   razorpayPaymentId: { type: String },
   razorpaySignature: { type: String },
+  paymentProvider: { type: String, enum: ['razorpay', 'demo'], default: 'razorpay' },
   jobId: { type: mongoose.Schema.Types.ObjectId, ref: 'Job' }, // If it's a payment for a job
 }, { timestamps: true });
 

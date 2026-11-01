@@ -1,9 +1,12 @@
 import Razorpay from 'razorpay';
 import crypto from 'crypto';
 import util from 'util';
+import mongoose from 'mongoose';
 import User from '../models/user.model.js';
 import Transaction from '../models/transaction.model.js';
 import { logger } from '../utils/logger.js';
+
+const isDemoPaymentsEnabled = () => process.env.NODE_ENV === 'development';
 
 let _rzp = null;
 const getRazorpay = () => {
@@ -138,12 +141,71 @@ export const verifyPayment = async (req, res, next) => {
   }
 };
 
+export const createDemoTopUp = async (req, res, next) => {
+  if (!isDemoPaymentsEnabled()) {
+    return res.status(404).json({ message: 'Not found' });
+  }
+
+  const amount = Number(req.body?.amount);
+  const amountInPaise = Math.round(amount * 100);
+  if (
+    !Number.isFinite(amount) ||
+    amountInPaise < 100 ||
+    amountInPaise > 500000 ||
+    Math.abs(amount * 100 - amountInPaise) > 1e-8
+  ) {
+    return res.status(400).json({ message: 'Enter an amount from ₹1 to ₹5,000, with up to 2 decimal places' });
+  }
+
+  const amountInINR = amountInPaise / 100;
+  const session = await mongoose.startSession();
+  try {
+    let updatedBalance;
+    await session.withTransaction(async () => {
+      await Transaction.create([{
+        user: req.user.id,
+        amount: amountInINR,
+        creditsAdded: amountInINR,
+        type: 'deposit',
+        status: 'completed',
+        paymentProvider: 'demo',
+        razorpayPaymentId: `demo_${crypto.randomUUID()}`,
+      }], { session });
+
+      const user = await User.findByIdAndUpdate(
+        req.user.id,
+        { $inc: { creditBalance: amountInINR } },
+        { new: true, session }
+      );
+      if (!user) {
+        throw new Error('Cannot add demo credits because the user account was not found');
+      }
+      updatedBalance = user.creditBalance;
+    });
+
+    res.json({
+      message: 'Demo credits added. No real payment was made.',
+      creditsAdded: amountInINR,
+      creditBalance: updatedBalance,
+      simulated: true,
+    });
+  } catch (error) {
+    next(error);
+  } finally {
+    await session.endSession();
+  }
+};
+
 // Get History and Balance
 export const getBillingHistory = async (req, res, next) => {
   try {
     const transactions = await Transaction.find({ user: req.user.id }).sort({ createdAt: -1 });
     const user = await User.findById(req.user.id).select('creditBalance');
-    res.json({ creditBalance: user.creditBalance || 0, transactions });
+    res.json({
+      creditBalance: user.creditBalance || 0,
+      transactions,
+      demoPaymentsEnabled: isDemoPaymentsEnabled(),
+    });
   } catch (error) {
     next(error);
   }

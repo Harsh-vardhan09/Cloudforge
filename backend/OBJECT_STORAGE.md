@@ -15,11 +15,6 @@ Job scripts and outputs are stored in a private S3-compatible bucket. The backen
       "Effect": "Allow",
       "Action": ["s3:PutObject", "s3:GetObject"],
       "Resource": "arn:aws:s3:::your-bucket/jobs/*"
-    },
-    {
-      "Effect": "Allow",
-      "Action": ["s3:ListBucket"],
-      "Resource": "arn:aws:s3:::your-bucket"
     }
   ]
 }
@@ -37,6 +32,8 @@ OBJECT_STORAGE_SECRET_ACCESS_KEY=
 
 For AWS, leave `OBJECT_STORAGE_ENDPOINT` empty and use the normal AWS credential provider chain (an IAM role is recommended). If using IAM access keys instead, set both access-key variables and keep them out of source control. For MinIO or another S3-compatible service, set its endpoint URL and credentials. Restart the backend after changing environment variables.
 
+The app does not need `s3:ListBucket`: it issues presigned requests for known object keys and verifies uploaded scripts with `HeadObject` (authorized by `s3:GetObject`).
+
 4. Configure the bucket's **CORS** to allow the exact origin(s) where the frontend runs. For local Vite development, allow `http://localhost:5173` and/or `http://127.0.0.1:5173`; for production, allow your deployed frontend origin. Example:
 
 ```json
@@ -51,7 +48,7 @@ For AWS, leave `OBJECT_STORAGE_ENDPOINT` empty and use the normal AWS credential
 ]
 ```
 
-The bucket must exist before uploads. Keep S3 Block Public Access enabled; the application uses presigned URLs and does not require public bucket access. The backend limits script uploads to 50 MB and job output archives to 2 GB. Presigned requests expire after 15 minutes.
+Setting CORS is a one-time bucket administration step and requires `s3:PutBucketCORS` on the bucket. Checking the current CORS configuration requires `s3:GetBucketCORS`. These are **not** needed by the running app; an administrator can configure the CORS JSON in the S3 console. The bucket must exist before uploads. Keep S3 Block Public Access enabled; the application uses presigned URLs and does not require public bucket access. The backend limits script uploads to 50 MB and job output archives to 2 GB. Presigned requests expire after 15 minutes.
 
 With the backend dependencies installed and credentials available, `cd backend && npm run create-bucket` can create a private AWS bucket, configure local CORS origins, and write its name to the local `.env`. Review the generated bucket name and region before deploying.
 

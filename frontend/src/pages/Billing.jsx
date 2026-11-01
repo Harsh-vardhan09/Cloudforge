@@ -32,6 +32,15 @@ const Billing = () => {
 
     try {
       setAddingFunds(true);
+      if (data.demoPaymentsEnabled) {
+        const { data: result } = await api.post('/billing/demo-topup', {
+          amount: Number(amountInINR),
+        });
+        await Promise.all([fetchBillingData(), fetchUser()]);
+        alert(`${result.message} ${result.creditsAdded} CR added.`);
+        return;
+      }
+
       // 1. Create order on backend
       const { data: order } = await api.post('/billing/order', { amount: parseFloat(amountInINR) });
 
@@ -69,7 +78,7 @@ const Billing = () => {
       rzp.open();
     } catch (err) {
       console.error("Razorpay error:", err);
-      alert("Failed to initiate payment.");
+      alert(err.response?.data?.message || "Failed to initiate payment.");
     } finally {
       setAddingFunds(false);
     }
@@ -112,14 +121,21 @@ const Billing = () => {
             </h2>
             
             <div className="mt-7 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">Buy Credits (1 INR = 1 CR)</span>
+              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">
+                {data.demoPaymentsEnabled ? 'Add Demo Credits (1 INR = 1 CR)' : 'Buy Credits (1 INR = 1 CR)'}
+              </span>
+              {data.demoPaymentsEnabled && (
+                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200" role="status">
+                  Development simulation only. No real payment is made; these credits are for local testing.
+                </p>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 {[500, 1000, 5000].map(amt => (
                   <button
                     key={amt}
                     onClick={() => initiatePayment(amt)}
                     disabled={addingFunds}
-                    className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 px-3 text-sm font-medium hover:bg-white/10 hover:border-primary/50 transition-colors"
+                    className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 px-3 text-sm font-medium text-white hover:bg-white/10 hover:border-primary/50 transition-colors"
                   >
                     ₹{amt}
                   </button>
@@ -198,7 +214,9 @@ const Billing = () => {
                   {tx.type === 'deposit' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium capitalize text-white">{tx.type} {tx.razorpayPaymentId ? `· ${tx.razorpayPaymentId.substring(0,8)}` : ''}</span>
+                  <span className="truncate text-sm font-medium capitalize text-white">
+                    {tx.type} {tx.paymentProvider === 'demo' ? '· DEMO' : tx.razorpayPaymentId ? `· ${tx.razorpayPaymentId.substring(0,8)}` : ''}
+                  </span>
                   <span className="mt-0.5 text-[0.68rem] text-text-dim">{new Date(tx.createdAt).toLocaleString()}</span>
                 </div>
                 <span className={`ml-auto font-mono text-sm font-semibold ${tx.type === 'deposit' ? 'text-success' : 'text-error'}`}>
