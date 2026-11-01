@@ -1,484 +1,667 @@
-import React, { useRef, useState } from 'react';
-import { AnimatePresence, motion as Motion } from 'framer-motion';
-import {
-  AlertTriangle,
-  ArrowRight,
-  Check,
-  Cpu,
-  Database,
-  FileCode,
-  Lightbulb,
-  Loader2,
-  PlayCircle,
-  Server,
-  Sparkles,
-  Trash2,
-  UploadCloud,
-  X,
+import React, { useState, useRef } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { 
+  X, PlayCircle, Loader2, Server, Cpu, Layers, CreditCard, 
+  Sparkles, Bot, Check, ArrowRight, Lightbulb, Code2, AlertTriangle,
+  UploadCloud, FileCode, CheckCircle2, Trash2, ListOrdered
 } from 'lucide-react';
 import api from '../services/api';
+import { useAuth } from '../context/AuthContext';
 
-const MAX_UPLOAD_BYTES = 50 * 1024 * 1024;
-const SCRIPT_EXTENSIONS = /\.(py|sh|ipynb)$/i;
-const DATASET_EXTENSIONS = /\.(csv|json|jsonl|txt|zip|tar|tar\.gz|npy|npz|parquet)$/i;
+const AI_PRESETS = [
+  { label: 'PyTorch CUDA Benchmark', prompt: 'Matrix multiplication benchmark with CUDA TFLOPs calculation' },
+  { label: 'Train CNN (CIFAR-10)', prompt: 'Train a CNN model on GPU with synthetic batch tensors' },
+  { label: 'Whisper Speech to Text', prompt: 'Setup OpenAI Whisper for GPU audio transcription' },
+  { label: 'HuggingFace LLM Stack', prompt: 'Load HuggingFace transformer tokenizer and test GPU inference' },
+  { label: 'Stable Diffusion Latents', prompt: 'Test FP16 latent tensor pipeline for Stable Diffusion' },
+];
 
-const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null }) => {
-  const scriptInputRef = useRef(null);
-  const datasetInputRef = useRef(null);
+const SAMPLE_SCRIPTS = {
+  mnist: {
+    name: 'train_mnist.py',
+    content: `import torch
+import torch.nn as nn
+import torch.optim as optim
+import time
+
+print(f"CUDA Available: {torch.cuda.is_available()}")
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+print(f"Using device: {device} ({torch.cuda.get_device_name(0) if torch.cuda.is_available() else 'CPU'})")
+
+class Net(nn.Module):
+    def __init__(self):
+        super().__init__()
+        self.conv = nn.Conv2d(1, 32, 3)
+        self.fc = nn.Linear(32 * 26 * 26, 10)
+    def forward(self, x):
+        return self.fc(torch.relu(self.conv(x)).flatten(1))
+
+model = Net().to(device)
+criterion = nn.CrossEntropyLoss()
+optimizer = optim.Adam(model.parameters(), lr=0.001)
+
+print("Starting 10 synthetic training epochs...")
+for epoch in range(1, 11):
+    x = torch.randn(64, 1, 28, 28, device=device)
+    y = torch.randint(0, 10, (64,), device=device)
+    optimizer.zero_grad()
+    loss = criterion(model(x), y)
+    loss.backward()
+    optimizer.step()
+    print(f"Epoch {epoch:02d}/10 | Loss: {loss.item():.4f}")
+
+print("Training finished successfully on GPU!")
+`
+  },
+  benchmark: {
+    name: 'cuda_benchmark.py',
+    content: `import torch
+import time
+
+print("Initializing CUDA Benchmark...")
+if not torch.cuda.is_available():
+    print("CUDA is unavailable!")
+    exit(1)
+
+device = "cuda"
+print(f"Device: {torch.cuda.get_device_name(0)}")
+n = 8192
+a = torch.randn(n, n, device=device)
+b = torch.randn(n, n, device=device)
+
+# Warmup
+torch.matmul(a, b)
+torch.cuda.synchronize()
+
+print(f"Running 10 matrix multiplications ({n}x{n})...")
+t0 = time.time()
+for _ in range(10):
+    torch.matmul(a, b)
+torch.cuda.synchronize()
+avg_time = (time.time() - t0) / 10.0
+
+tflops = (2 * n**3) / (avg_time * 1e12)
+print(f"Average time: {avg_time*1000:.2f} ms")
+print(f"Compute Throughput: {tflops:.2f} TFLOPs")
+print("Benchmark completed with 0 errors.")
+`
+  }
+};
+
+const JobLaunchModal = ({ gpu = null, onClose, onSuccess, initialConfig = null, defaultTab = 'script' }) => {
+  const { user } = useAuth();
+  const fileInputRef = useRef(null);
+
+  // Tab mode: 'script' (Upload Script) or 'command' (Raw Command)
+  const [tabMode, setTabMode] = useState(defaultTab);
+
+  // Script Upload state
   const [scriptName, setScriptName] = useState(initialConfig?.scriptName || '');
   const [scriptContent, setScriptContent] = useState(initialConfig?.scriptContent || '');
-  const [datasetFile, setDatasetFile] = useState(null);
-  const [prompt, setPrompt] = useState('');
-  const [recommendation, setRecommendation] = useState(null);
-  const [applied, setApplied] = useState(false);
-  const [dockerImage, setDockerImage] = useState(initialConfig?.dockerImage || 'pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime');
-  const [command, setCommand] = useState(initialConfig?.command || '');
-  const [vramRequired, setVramRequired] = useState(initialConfig?.vramRequired || gpu?.vram || 8);
-  const [env, setEnv] = useState(initialConfig?.env || {});
-  const [busy, setBusy] = useState(false);
+
+  const [formData, setFormData] = useState({
+    dockerImage: initialConfig?.dockerImage || 'pytorch/pytorch:2.1.2-cuda12.1-cudnn8-runtime', 
+    command: initialConfig?.command || 'python -c "import torch; print(f\\"GPU Available: {torch.cuda.is_available()}\\"); print(\\"Starting compute task...\\"); import time; time.sleep(5); print(\\"Task complete!\\")"',
+    vramRequired: initialConfig?.vramRequired || gpu?.vram || 8
+  });
+
+  const [loading, setLoading] = useState(false);
+  const [queuing, setQueuing] = useState(false);
+  const [paying, setPaying] = useState(false);
   const [error, setError] = useState('');
 
-  const handleScriptChange = (event) => {
-    const file = event.target.files?.[0];
+  // AI Assistant States
+  const [showAiAssistant, setShowAiAssistant] = useState(false);
+  const [aiPrompt, setAiPrompt] = useState('');
+  const [aiLoading, setAiLoading] = useState(false);
+  const [aiResult, setAiResult] = useState(null);
+  const [aiApplied, setAiApplied] = useState(false);
+
+  // Handle file selection
+  const handleFileChange = (e) => {
+    const file = e.target.files?.[0];
     if (!file) return;
-    if (!SCRIPT_EXTENSIONS.test(file.name)) {
-      setError('Choose a Python (.py), shell (.sh), or Jupyter Notebook (.ipynb) script.');
-      event.target.value = '';
+    if (!/\.(py|sh)$/i.test(file.name)) {
+      setError('Only Python (.py) and shell (.sh) scripts can be uploaded.');
+      e.target.value = '';
       return;
     }
-    if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
-      setError('Script files must be between 1 byte and 50 MB.');
-      event.target.value = '';
+    if (file.size > 50 * 1024 * 1024) {
+      setError('Scripts must be 50 MB or smaller.');
+      e.target.value = '';
       return;
     }
 
+    setError('');
+    setScriptName(file.name);
+
     const reader = new FileReader();
-    reader.onload = () => {
-      const content = String(reader.result || '');
-      setScriptName(file.name);
+    reader.onload = (event) => {
+      const content = event.target?.result || '';
       setScriptContent(content);
-      setRecommendation(null);
-      setApplied(false);
-      setError('');
-      const path = `/workspace/${file.name}`;
-      setCommand(file.name.toLowerCase().endsWith('.sh')
-        ? `bash ${path}`
-        : file.name.toLowerCase().endsWith('.ipynb')
-          ? `jupyter nbconvert --to notebook --execute ${path} --output /workspace/output_${file.name}`
-          : `python ${path}`);
+
+      // Auto-set execution command
+      const cmd = file.name.toLowerCase().endsWith('.sh')
+        ? `bash /workspace/${file.name}` 
+        : `python /workspace/${file.name}`;
+      setFormData(prev => ({ ...prev, command: cmd }));
     };
-    reader.onerror = () => setError('Could not read the selected script file.');
     reader.readAsText(file);
   };
 
-  const handleDatasetChange = (event) => {
-    const file = event.target.files?.[0];
-    if (!file) return;
-    if (!DATASET_EXTENSIONS.test(file.name)) {
-      setError('Supported datasets: .csv, .json, .jsonl, .txt, .zip, .tar, .tar.gz, .npy, .npz, and .parquet.');
-      event.target.value = '';
-      return;
-    }
-    if (file.size < 1 || file.size > MAX_UPLOAD_BYTES) {
-      setError('Dataset files must be between 1 byte and 50 MB.');
-      event.target.value = '';
-      return;
-    }
-    setDatasetFile(file);
-    setRecommendation(null);
-    setApplied(false);
-    setError('');
+  const handleLoadSample = (key) => {
+    const sample = SAMPLE_SCRIPTS[key];
+    if (!sample) return;
+    setScriptName(sample.name);
+    setScriptContent(sample.content);
+    setFormData(prev => ({
+      ...prev,
+      command: `python /workspace/${sample.name}`
+    }));
   };
 
-  const requestRecommendation = async () => {
-    if (!prompt.trim()) {
-      setError('Describe the workload you want to run first.');
-      return;
-    }
+  const handleClearScript = () => {
+    setScriptName('');
+    setScriptContent('');
+    if (fileInputRef.current) fileInputRef.current.value = '';
+  };
 
-    setBusy(true);
-    setError('');
-    setApplied(false);
+  const handleAskAi = async (customPrompt) => {
+    const promptToSend = customPrompt || aiPrompt;
+    if (!promptToSend && !formData.command && !scriptContent) return;
+
     try {
-      const { data } = await api.post('/ai/assistant', {
-        prompt: prompt.trim(),
+      setAiLoading(true);
+      setError('');
+      const resp = await api.post('/ai/assistant', {
+        prompt: promptToSend,
         gpuModel: gpu?.model,
         gpuVram: gpu?.vram,
-        currentCommand: command,
-        currentImage: dockerImage,
-        scriptName,
-        scriptContent,
-        datasetName: datasetFile?.name || '',
+        currentCommand: formData.command,
+        currentImage: formData.dockerImage,
       });
-      setRecommendation(data);
-    } catch (requestError) {
-      setError(requestError.response?.data?.message || 'Could not prepare workload recommendations.');
+
+      setAiResult(resp.data);
+      setAiApplied(false);
+    } catch (err) {
+      console.error('AI Assistant Error:', err);
+      setError(err.response?.data?.message || 'AI Assistant service unavailable');
     } finally {
-      setBusy(false);
+      setAiLoading(false);
     }
   };
 
-  const applyRecommendation = () => {
-    if (!recommendation) return;
-    setDockerImage(recommendation.dockerImage || dockerImage);
-    setCommand(recommendation.command || command);
-    setVramRequired(recommendation.vramRequired ?? vramRequired);
-    setEnv({
-      ...(recommendation.suggestedEnv || {}),
-      ...(datasetFile ? { DATASET_PATH: `/workspace/data/${datasetFile.name}` } : {}),
+  const handleApplyAiSuggestion = () => {
+    if (!aiResult) return;
+    setFormData({
+      dockerImage: aiResult.dockerImage || formData.dockerImage,
+      command: aiResult.command || formData.command,
+      vramRequired: aiResult.vramRequired !== undefined ? aiResult.vramRequired : formData.vramRequired,
     });
-    if (recommendation.suggestedScript) {
-      setScriptContent(recommendation.suggestedScript);
-      setScriptName(recommendation.suggestedScriptName || scriptName || 'recommended_job.py');
-    }
-    setApplied(true);
-  };
-
-  const uploadInputFile = async (file, kind) => {
-    const { data: upload } = await api.post('/jobs/uploads/presign', {
-      fileName: file.name,
-      size: file.size,
-      kind,
-    });
-    if (!upload?.url || !upload?.fields || !upload?.objectKey) {
-      throw new Error('Object storage did not provide a valid upload request.');
-    }
-    const body = new FormData();
-    Object.entries(upload.fields).forEach(([key, value]) => body.append(key, value));
-    body.append('file', new File([file], file.name, { type: upload.contentType }), file.name);
-    let response;
-    try {
-      response = await fetch(upload.url, { method: 'POST', body });
-    } catch {
-      throw new Error('Could not reach S3. Check bucket CORS and endpoint settings.');
-    }
-    if (!response.ok) throw new Error(`S3 ${kind} upload failed (HTTP ${response.status}).`);
-    return upload.objectKey;
+    setAiApplied(true);
+    setTimeout(() => {
+      setShowAiAssistant(false);
+      setAiApplied(false);
+    }, 1200);
   };
 
   const submitJob = async () => {
-    if (!applied) {
-      setError('Review and apply the workload recommendation before submitting.');
-      return;
-    }
-    if (!command.trim()) {
-      setError('The recommendation must include an execution command.');
-      return;
+    let inputObjectKey = '';
+    if (scriptName) {
+      const contentType = scriptName.toLowerCase().endsWith('.sh')
+        ? 'text/x-shellscript'
+        : 'text/x-python';
+      const scriptBlob = new Blob([scriptContent], { type: contentType });
+      const { data: upload } = await api.post('/jobs/uploads/presign', {
+        fileName: scriptName,
+        size: scriptBlob.size,
+      });
+      const uploadFormData = new FormData();
+      Object.entries(upload.fields).forEach(([key, value]) => uploadFormData.append(key, value));
+      uploadFormData.append('file', scriptBlob, scriptName);
+      const uploadResponse = await fetch(upload.url, { method: 'POST', body: uploadFormData });
+      if (!uploadResponse.ok) {
+        throw new Error('Could not upload script to object storage.');
+      }
+      inputObjectKey = upload.objectKey;
     }
 
-    setBusy(true);
+    const payload = {
+      ...formData,
+      vramRequired: parseFloat(formData.vramRequired),
+      gpuId: gpu?._id,
+      scriptName: scriptName || "",
+      inputObjectKey,
+    };
+    const resp = await api.post('/jobs', payload);
+    onSuccess(resp.data);
+    onClose();
+  };
+
+  // Module 4: Explicit Queue Submission
+  const handleQueueJob = async () => {
+    try {
+      setQueuing(true);
+      setError('');
+      await submitJob();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to queue job.');
+    } finally {
+      setQueuing(false);
+    }
+  };
+
+  // Immediate Launch
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setLoading(true);
     setError('');
     try {
-      let inputObjectKey = '';
-      if (scriptName) {
-        const contentType = scriptName.toLowerCase().endsWith('.sh')
-          ? 'text/x-shellscript'
-          : scriptName.toLowerCase().endsWith('.ipynb')
-            ? 'application/x-ipynb+json'
-            : 'text/x-python';
-        const scriptFile = new File([scriptContent], scriptName, { type: contentType });
-        inputObjectKey = await uploadInputFile(scriptFile, 'script');
-      }
-      const datasetObjectKey = datasetFile
-        ? await uploadInputFile(datasetFile, 'dataset')
-        : '';
-      const { data } = await api.post('/jobs', {
-        dockerImage,
-        command,
-        vramRequired: Number(vramRequired),
-        env,
-        gpuId: gpu?._id,
-        scriptName,
-        inputObjectKey,
-        datasetName: datasetFile?.name || '',
-        datasetObjectKey,
-      });
-      onSuccess(data);
-      onClose();
-    } catch (submitError) {
-      setError(submitError.response?.data?.message || submitError.message || 'Could not submit the job.');
+      await submitJob();
+    } catch (err) {
+      setError(err.response?.data?.message || err.message || 'Failed to submit job.');
     } finally {
-      setBusy(false);
+      setLoading(false);
+    }
+  };
+
+  const handlePayAndLaunch = async () => {
+    const amount = gpu?.pricePerHour || 1.0;
+    try {
+      setPaying(true);
+      setError('');
+      const { data: order } = await api.post('/billing/order', { amount });
+
+      const options = {
+        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+        amount: order.amount,
+        currency: order.currency,
+        name: "ComputeGrid",
+        description: `Direct Launch on ${gpu?.model || 'GPU'}`,
+        order_id: order.id,
+        handler: async (response) => {
+          try {
+            await api.post('/billing/verify', { ...response, amountUSD: amount });
+            await submitJob();
+          } catch {
+            setError("Payment verified but job dispatch failed.");
+          }
+        },
+        prefill: { name: user?.name, email: user?.email },
+        theme: { color: "#3b82f6" },
+      };
+      const rzp = new window.Razorpay(options);
+      rzp.open();
+    } catch {
+      setError("Failed to initiate direct payment.");
+    } finally {
+      setPaying(false);
     }
   };
 
   return (
-    <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
-      <Motion.div
+    <div className="fixed inset-0 flex items-center justify-center z-[1001] p-4">
+      <motion.div 
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}
-        className="absolute inset-0 bg-ink/30 backdrop-blur-md"
+        className="absolute inset-0 bg-black/85 backdrop-blur-md"
         onClick={onClose}
       />
-      <Motion.div
-        initial={{ opacity: 0, scale: 0.96, y: 16 }}
+      
+      <motion.div 
+        initial={{ opacity: 0, scale: 0.95, y: 20 }}
         animate={{ opacity: 1, scale: 1, y: 0 }}
-        exit={{ opacity: 0, scale: 0.96, y: 16 }}
-        className="glass-card relative flex max-h-[92vh] w-full max-w-3xl flex-col gap-5 overflow-y-auto p-6 md:p-8"
+        exit={{ opacity: 0, scale: 0.95, y: 20 }}
+        className="w-full max-w-2xl glass-card p-6 md:p-8 relative overflow-hidden flex flex-col gap-5 max-h-[92vh] overflow-y-auto"
       >
-        <div className="absolute left-0 top-0 h-1 w-full bg-gradient-to-r from-primary via-purple-500 to-accent" />
-        <header className="flex items-start justify-between gap-4">
-          <div>
-            <h2 className="flex items-center gap-2 text-2xl font-bold">
-              <Sparkles className="text-primary" />
-              Prepare a GPU workload
-            </h2>
-            <p className="mt-1 text-xs text-text-dim">
-              Describe the goal. The assistant will review your files and recommend the setup before you submit.
+        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-primary via-purple-500 to-accent" />
+        
+        {/* Header */}
+        <div className="flex justify-between items-start">
+          <div className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <h2 className="text-2xl font-bold flex items-center gap-2">
+                <PlayCircle className="text-primary" />
+                Submit Compute Job
+              </h2>
+              <span className="px-2 py-0.5 rounded text-[0.65rem] font-extrabold uppercase tracking-wider bg-primary/20 text-primary border border-primary/30">
+                {gpu ? gpu.model : 'Cluster Pool'}
+              </span>
+            </div>
+            <p className="text-xs text-text-dim">
+              Module 4: Upload a script to queue or deploy on the GPU cluster
             </p>
           </div>
-          <div className="flex items-center gap-3">
-            <span className="rounded border border-primary/30 bg-primary/20 px-2 py-0.5 text-[0.65rem] font-extrabold uppercase text-primary">
-              {gpu ? gpu.model : 'Cluster Pool'}
-            </span>
-            <button type="button" onClick={onClose} aria-label="Close" className="text-text-dim hover:text-white">
+
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setShowAiAssistant(!showAiAssistant)}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 transition-all border ${
+                showAiAssistant 
+                  ? 'bg-purple-600/30 text-purple-300 border-purple-500/50 shadow-[0_0_15px_rgba(168,85,247,0.4)]' 
+                  : 'bg-white/5 text-purple-400 border-purple-500/20 hover:bg-purple-500/10'
+              }`}
+            >
+              <Sparkles size={14} className="text-purple-400 animate-pulse" />
+              {showAiAssistant ? 'Hide AI' : '✨ AI Assistant'}
+            </button>
+            <button onClick={onClose} className="p-2 hover:bg-white/5 rounded-lg transition-colors text-text-dim hover:text-white">
               <X size={20} />
             </button>
           </div>
-        </header>
+        </div>
 
-        <section className="flex flex-col gap-3 rounded-2xl border border-purple-500/30 bg-purple-950/20 p-5">
-          <label htmlFor="workload-prompt" className="flex items-center gap-2 text-sm font-bold text-white">
-            <Lightbulb size={17} className="text-purple-300" />
-            What do you want to run?
-          </label>
-          <textarea
-            id="workload-prompt"
-            rows={3}
-            value={prompt}
-            onChange={(event) => {
-              setPrompt(event.target.value);
-              setRecommendation(null);
-              setApplied(false);
-            }}
-            placeholder="Train a PyTorch image classifier on my CIFAR-10 script, using the GPU"
-            className="w-full resize-y rounded-xl border border-ink/15 bg-surface-muted p-3 text-sm text-white placeholder-white/40 focus:border-purple-400 focus:outline-none"
-          />
-          <div className="grid gap-3 sm:grid-cols-2">
-            <div className="flex min-w-0 flex-col gap-2">
-              <input
-                ref={scriptInputRef}
-                type="file"
-                accept=".py,.sh,.ipynb"
-                onChange={handleScriptChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => scriptInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
-              >
-                <FileCode size={16} />
-                {scriptName || 'Add script (optional)'}
-              </button>
-              <span className="text-[0.68rem] text-text-dim">Python, shell, or notebook · up to 50 MB</span>
-            </div>
-            <div className="flex min-w-0 flex-col gap-2">
-              <input
-                ref={datasetInputRef}
-                type="file"
-                accept=".csv,.json,.jsonl,.txt,.zip,.tar,.gz,.npy,.npz,.parquet"
-                onChange={handleDatasetChange}
-                className="hidden"
-              />
-              <button
-                type="button"
-                onClick={() => datasetInputRef.current?.click()}
-                className="flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white/5 px-3 py-3 text-xs font-semibold text-white hover:bg-white/10"
-              >
-                <Database size={16} />
-                {datasetFile?.name || 'Add dataset (optional)'}
-              </button>
-              <span className="text-[0.68rem] text-text-dim">CSV, JSON, archives, NumPy, Parquet · up to 50 MB</span>
-            </div>
-          </div>
-          {(scriptName || datasetFile) && (
-            <div className="flex flex-wrap gap-2">
-              {scriptName && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setScriptName('');
-                    setScriptContent('');
-                    setRecommendation(null);
-                    setApplied(false);
-                    if (scriptInputRef.current) scriptInputRef.current.value = '';
-                  }}
-                  className="flex items-center gap-1 rounded-lg border border-ink/15 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
-                >
-                  <Trash2 size={12} /> Remove script
-                </button>
-              )}
-              {datasetFile && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setDatasetFile(null);
-                    setRecommendation(null);
-                    setApplied(false);
-                    if (datasetInputRef.current) datasetInputRef.current.value = '';
-                  }}
-                  className="flex items-center gap-1 rounded-lg border border-ink/15 px-2 py-1 text-[0.68rem] text-text-dim hover:text-white"
-                >
-                  <Trash2 size={12} /> Remove dataset
-                </button>
-              )}
-            </div>
-          )}
+        {/* Tab Switcher: Upload Script vs Command */}
+        <div className="flex p-1 bg-white/5 rounded-xl border border-white/10 gap-1">
           <button
             type="button"
-            onClick={requestRecommendation}
-            disabled={busy || !prompt.trim()}
-            className="flex items-center justify-center gap-2 self-start rounded-xl bg-purple-600 px-5 py-2.5 text-sm font-bold text-white hover:bg-purple-500 disabled:opacity-50"
+            onClick={() => setTabMode('script')}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              tabMode === 'script'
+                ? 'bg-primary text-white shadow-glow'
+                : 'text-text-dim hover:text-white hover:bg-white/5'
+            }`}
           >
-            {aiLoadingIcon(busy)}
-            {busy ? 'Preparing recommendation…' : 'Get AI recommendations'}
+            <UploadCloud size={14} />
+            Upload Script (.py / .sh)
           </button>
-        </section>
+          <button
+            type="button"
+            onClick={() => setTabMode('command')}
+            className={`flex-1 py-2 rounded-lg text-xs font-bold flex items-center justify-center gap-2 transition-all ${
+              tabMode === 'command'
+                ? 'bg-primary text-white shadow-glow'
+                : 'text-text-dim hover:text-white hover:bg-white/5'
+            }`}
+          >
+            <Code2 size={14} />
+            Inline Command
+          </button>
+        </div>
 
+        {/* AI Assistant Drawer */}
         <AnimatePresence>
-          {recommendation && (
-            <Motion.section
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 8 }}
-              className="flex flex-col gap-4 rounded-2xl border border-primary/30 bg-primary/5 p-5"
+          {showAiAssistant && (
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="bg-purple-950/20 border border-purple-500/30 rounded-2xl p-5 flex flex-col gap-4 overflow-hidden"
             >
-              <div className="flex flex-wrap items-center gap-2">
-                <h3 className="flex items-center gap-2 text-sm font-bold text-white">
-                  <Lightbulb size={16} className="text-primary" /> Review workload plan
-                </h3>
-                <span className="rounded bg-white/10 px-2 py-0.5 text-[0.65rem] text-text-dim">
-                  {recommendation.source === 'llm' ? 'Cloud AI' : 'Local rules'}
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-2">
+                  <Bot className="text-purple-400" size={18} />
+                  <span className="text-sm font-bold text-white">AI Script Assistant & Validator</span>
+                </div>
+                <span className="text-[0.65rem] text-purple-300/80 uppercase tracking-widest font-mono">
+                  Module 9 Helper
                 </span>
-                {recommendation.checkpointSupported && (
-                  <span className="rounded border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[0.65rem] text-emerald-300">
-                    Checkpoint code included
-                  </span>
-                )}
               </div>
-              <p className="text-xs leading-relaxed text-text-dim">{recommendation.explanation}</p>
-              {recommendation.source !== 'llm' && (
-                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200">
-                  Local recommendations use rules, not a hosted AI model. They do not automatically rewrite an uploaded script.
-                </p>
-              )}
-              {datasetFile && recommendation.datasetPlan && (
-                <p className={`rounded-lg border px-3 py-2 text-xs ${
-                  recommendation.datasetUsed
-                    ? 'border-emerald-400/30 bg-emerald-400/10 text-emerald-200'
-                    : 'border-amber-400/30 bg-amber-400/10 text-amber-200'
-                }`}>
-                  {recommendation.datasetPlan}
-                </p>
-              )}
-              <div className="grid gap-3 text-xs sm:grid-cols-2">
-                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
-                  <span className="flex items-center gap-1.5 text-text-dim"><Server size={13} /> Docker image</span>
-                  <p className="mt-1 break-all font-mono text-white">{recommendation.dockerImage}</p>
-                </div>
-                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
-                  <span className="flex items-center gap-1.5 text-text-dim"><Cpu size={13} /> GPU memory</span>
-                  <p className="mt-1 text-white">{recommendation.vramRequired} GB</p>
-                </div>
-                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
-                  <span className="text-text-dim">Suggested batch size</span>
-                  <p className="mt-1 text-white">
-                    {recommendation.batchSize ?? 'Not specified'}
-                    <span className="ml-1 text-text-dim">· use if the script supports it</span>
-                  </p>
-                </div>
-                <div className="rounded-xl border border-ink/15 bg-surface-muted p-3">
-                  <span className="text-text-dim">Checkpointing</span>
-                  <p className="mt-1 text-white">{recommendation.checkpointPlan || 'No checkpoint plan provided.'}</p>
-                </div>
+
+              {/* Quick Prompt Presets */}
+              <div className="flex flex-wrap gap-2">
+                {AI_PRESETS.map((p, idx) => (
+                  <button
+                    key={idx}
+                    type="button"
+                    onClick={() => {
+                      setAiPrompt(p.prompt);
+                      handleAskAi(p.prompt);
+                    }}
+                    className="text-[0.7rem] px-2.5 py-1 rounded-md bg-white/5 hover:bg-purple-500/20 border border-white/5 hover:border-purple-500/30 text-text-dim hover:text-white transition-all text-left"
+                  >
+                    ⚡ {p.label}
+                  </button>
+                ))}
               </div>
-              {recommendation.optimizations?.length > 0 && (
-                <ul className="list-disc space-y-1 pl-5 text-xs text-text-dim">
-                  {recommendation.optimizations.map((item, index) => <li key={`${index}-${item}`}>{item}</li>)}
-                </ul>
-              )}
-              {datasetFile && (
-                <p className="text-xs text-text-dim">
-                  Dataset will be available to the job at <code className="text-white">/workspace/data/{datasetFile.name}</code>.
-                </p>
-              )}
-              {recommendation.suggestedScript && (
-                <details className="rounded-xl border border-ink/15 bg-surface-muted p-3">
-                  <summary className="cursor-pointer text-xs font-semibold text-white">
-                    Review suggested script · {recommendation.suggestedScriptName || scriptName || 'recommended_job.py'}
-                  </summary>
-                  <textarea
-                    rows={10}
-                    value={recommendation.suggestedScript}
-                    onChange={(event) => setRecommendation({ ...recommendation, suggestedScript: event.target.value })}
-                    className="mt-3 w-full rounded-lg border border-ink/15 bg-surface-muted p-3 font-mono text-xs text-white focus:border-primary focus:outline-none"
-                  />
-                </details>
-              )}
-              <div className="flex flex-wrap items-center justify-between gap-3 border-t border-ink/15 pt-3">
-                <div className="min-w-0 text-[0.7rem] text-text-dim">
-                  <p className="truncate">Command: <code className="text-white">{recommendation.command}</code></p>
-                  {recommendation.datasetPath && <p>Dataset path: <code className="text-white">{recommendation.datasetPath}</code></p>}
-                </div>
+
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="Describe your workload..."
+                  value={aiPrompt}
+                  onChange={(e) => setAiPrompt(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), handleAskAi())}
+                  className="flex-1 bg-black/40 border border-white/10 rounded-xl px-3 py-2 text-xs focus:outline-none focus:border-purple-400 text-white placeholder-white/30"
+                />
                 <button
                   type="button"
-                  onClick={applyRecommendation}
-                  disabled={applied}
-                  className="flex items-center gap-2 rounded-xl bg-primary px-4 py-2 text-xs font-bold text-text hover:brightness-110 disabled:opacity-70"
+                  disabled={aiLoading}
+                  onClick={() => handleAskAi()}
+                  className="px-4 py-2 bg-gradient-to-r from-purple-600 to-primary text-white text-xs font-bold rounded-xl hover:opacity-95 transition-all flex items-center gap-1.5 disabled:opacity-50"
                 >
-                  {applied ? <Check size={14} /> : <ArrowRight size={14} />}
-                  {applied ? 'Applied' : 'Apply plan'}
+                  {aiLoading ? <Loader2 size={14} className="animate-spin" /> : <Sparkles size={14} />}
+                  Generate
                 </button>
               </div>
-            </Motion.section>
+
+              {aiResult && (
+                <div className="bg-black/60 rounded-xl p-4 border border-purple-500/20 flex flex-col gap-3 text-xs">
+                  <div className="flex items-start justify-between">
+                    <div>
+                      <p className="font-semibold text-purple-300 flex items-center gap-1.5">
+                        <Lightbulb size={14} /> AI Recommendation
+                      </p>
+                      <p className="text-[0.75rem] text-text-dim mt-0.5">{aiResult.explanation}</p>
+                    </div>
+                  </div>
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="button"
+                      onClick={handleApplyAiSuggestion}
+                      disabled={aiApplied}
+                      className="px-4 py-1.5 rounded-lg text-xs font-bold bg-purple-600 hover:bg-purple-500 text-white shadow-glow transition-all flex items-center gap-1.5"
+                    >
+                      {aiApplied ? <Check size={14} /> : <ArrowRight size={14} />}
+                      {aiApplied ? 'Applied!' : 'Apply AI Suggestion'}
+                    </button>
+                  </div>
+                </div>
+              )}
+            </motion.div>
           )}
         </AnimatePresence>
 
-        {applied && (
-          <div className="flex flex-col gap-2 rounded-xl border border-ink/15 bg-white/[0.03] p-4 text-xs text-text-dim">
-            <span className="font-semibold text-white">Ready to submit</span>
-            <span>{dockerImage} · {vramRequired} GB VRAM · {scriptName || 'Generated command'}</span>
-            {scriptName && (
-              <details>
-                <summary className="cursor-pointer text-primary">Review script before submission</summary>
-                <textarea
-                  rows={8}
-                  value={scriptContent}
-                  onChange={(event) => setScriptContent(event.target.value)}
-                  className="mt-2 w-full rounded-lg border border-ink/15 bg-surface-muted p-3 font-mono text-xs text-white"
+        {/* Form Body */}
+        <form onSubmit={handleSubmit} className="flex flex-col gap-5">
+          {tabMode === 'script' ? (
+            /* Script Upload Area */
+            <div className="flex flex-col gap-3">
+              <div className="flex justify-between items-center">
+                <label className="text-[0.75rem] font-bold uppercase text-text-dim flex items-center gap-2">
+                  <FileCode size={14} /> Upload Python / Shell Script
+                </label>
+                <div className="flex gap-2">
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSample('mnist')}
+                    className="text-[0.65rem] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-primary border border-primary/20 transition-all"
+                  >
+                    Load train_mnist.py
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleLoadSample('benchmark')}
+                    className="text-[0.65rem] px-2 py-0.5 rounded bg-white/5 hover:bg-white/10 text-accent border border-accent/20 transition-all"
+                  >
+                    Load benchmark.py
+                  </button>
+                </div>
+              </div>
+
+              {/* Upload Dropzone */}
+              {!scriptName ? (
+                <div 
+                  onClick={() => fileInputRef.current?.click()}
+                  className="border-2 border-dashed border-white/15 hover:border-primary/50 bg-white/[0.02] hover:bg-primary/[0.03] rounded-2xl p-6 flex flex-col items-center justify-center gap-2.5 cursor-pointer transition-all group"
+                >
+                  <input
+                    type="file"
+                    ref={fileInputRef}
+                    onChange={handleFileChange}
+                    accept=".py,.sh"
+                    className="hidden"
+                  />
+                  <div className="w-12 h-12 rounded-full bg-primary/10 text-primary flex items-center justify-center group-hover:scale-110 transition-transform">
+                    <UploadCloud size={24} />
+                  </div>
+                  <div className="text-center">
+                    <p className="text-sm font-bold text-white">Click to upload or drag & drop</p>
+                    <p className="text-xs text-text-dim">Supports .py, .sh, or custom compute scripts</p>
+                  </div>
+                </div>
+              ) : (
+                <div className="bg-black/50 border border-white/10 rounded-2xl p-4 flex flex-col gap-3">
+                  <div className="flex items-center justify-between pb-2 border-b border-white/5">
+                    <div className="flex items-center gap-2.5">
+                      <div className="p-2 rounded-lg bg-primary/20 text-primary">
+                        <FileCode size={18} />
+                      </div>
+                      <div>
+                        <p className="text-xs font-bold text-white font-mono">{scriptName}</p>
+                        <p className="text-[0.65rem] text-text-dim">
+                          {scriptContent.split('\n').length} lines • {new Blob([scriptContent]).size} bytes
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      type="button"
+                      onClick={handleClearScript}
+                      className="p-1.5 text-text-dim hover:text-error hover:bg-error/10 rounded-lg transition-all"
+                      title="Remove Script"
+                    >
+                      <Trash2 size={16} />
+                    </button>
+                  </div>
+
+                  {/* Code preview */}
+                  <textarea
+                    rows={6}
+                    value={scriptContent}
+                    onChange={(e) => setScriptContent(e.target.value)}
+                    className="w-full bg-black/40 border border-white/5 rounded-xl p-3 text-xs font-mono leading-relaxed text-[#c9d1d9] focus:outline-none focus:border-primary/50 resize-none"
+                    placeholder="Script content..."
+                  />
+                </div>
+              )}
+
+              {/* Generated Entrypoint */}
+              <div className="flex flex-col gap-1.5">
+                <label className="text-[0.7rem] font-bold uppercase text-text-dim">Execution Entrypoint</label>
+                <input
+                  type="text"
+                  value={formData.command}
+                  onChange={(e) => setFormData({ ...formData, command: e.target.value })}
+                  className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-xs font-mono text-white focus:outline-none focus:border-primary"
                 />
-              </details>
+              </div>
+            </div>
+          ) : (
+            /* Raw Command Input */
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.75rem] font-bold uppercase text-text-dim flex items-center gap-2">
+                <Layers size={14} /> Command (Bash or Python)
+              </label>
+              <textarea 
+                rows={5}
+                className="bg-white/5 border border-white/10 p-3 rounded-xl text-xs font-mono focus:outline-none focus:border-primary transition-all resize-none leading-relaxed text-[#c9d1d9]"
+                value={formData.command}
+                onChange={(e) => setFormData({...formData, command: e.target.value})}
+                required
+              />
+            </div>
+          )}
+
+          {/* Docker Image & VRAM */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.75rem] font-bold uppercase text-text-dim flex items-center gap-2">
+                <Server size={14} /> Docker Environment
+              </label>
+              <input 
+                type="text" 
+                className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary font-mono text-white"
+                value={formData.dockerImage}
+                onChange={(e) => setFormData({...formData, dockerImage: e.target.value})}
+                required
+              />
+            </div>
+
+            <div className="flex flex-col gap-2">
+              <label className="text-[0.75rem] font-bold uppercase text-text-dim flex items-center gap-2">
+                <Cpu size={14} /> VRAM Requirement (GB)
+              </label>
+              <input 
+                type="number" 
+                step="0.5"
+                className="bg-white/5 border border-white/10 p-2.5 rounded-xl text-xs focus:outline-none focus:border-primary font-mono text-white"
+                value={formData.vramRequired}
+                onChange={(e) => setFormData({...formData, vramRequired: e.target.value})}
+                required
+              />
+            </div>
+          </div>
+
+          {error && (
+             <div className="p-3 rounded-lg bg-error/10 border border-error/20 text-error text-[0.75rem] font-bold text-center flex items-center justify-center gap-2">
+                <AlertTriangle size={14} />
+                {error}
+             </div>
+          )}
+
+          {/* Submit Action Buttons */}
+          <div className="flex flex-col sm:flex-row gap-3 pt-2">
+            {/* Module 4: Queue Script Button */}
+            <button 
+              type="button"
+              disabled={loading || queuing}
+              onClick={handleQueueJob}
+              className="flex-1 py-3 px-5 rounded-xl font-bold text-xs bg-amber-500/20 text-amber-300 border border-amber-500/40 hover:bg-amber-500/30 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {queuing ? <Loader2 className="animate-spin" size={16} /> : (
+                <>
+                  <ListOrdered size={16} />
+                  Queue Script (Module 4)
+                </>
+              )}
+            </button>
+
+            {/* Direct Launch Buttons */}
+            {gpu && (
+              <button 
+                type="button"
+                disabled={loading || paying || queuing}
+                onClick={handlePayAndLaunch}
+                className="py-3 px-5 rounded-xl font-bold text-xs bg-primary text-white hover:bg-primary/90 transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+              >
+                {paying ? <Loader2 className="animate-spin text-white" size={16} /> : (
+                  <>
+                    <CreditCard size={16} />
+                    Pay & Run
+                  </>
+                )}
+              </button>
             )}
-          </div>
-        )}
 
-        {error && (
-          <div role="alert" className="flex items-center justify-center gap-2 rounded-lg border border-error/20 bg-error/10 p-3 text-center text-xs font-bold text-error">
-            <AlertTriangle size={14} />
-            {error}
+            <button 
+              type="submit"
+              disabled={loading || paying || queuing}
+              className="flex-1 py-3 px-5 rounded-xl font-bold text-xs bg-white/10 hover:bg-white/15 text-white transition-all flex items-center justify-center gap-2 disabled:opacity-50"
+            >
+              {loading ? <Loader2 className="animate-spin" size={16} /> : (
+                <>
+                  Launch Now
+                  <PlayCircle size={16} />
+                </>
+              )}
+            </button>
           </div>
-        )}
-
-        <footer className="flex flex-col gap-3 border-t border-ink/15 pt-4 sm:flex-row">
-          <button
-            type="button"
-            onClick={submitJob}
-            disabled={busy || !applied}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-white/10 px-5 py-3 text-xs font-bold text-white hover:bg-white/15 disabled:opacity-50"
-          >
-            {busy ? <Loader2 className="animate-spin" size={16} /> : <PlayCircle size={16} />}
-            Submit job to queue
-          </button>
-        </footer>
-      </Motion.div>
+        </form>
+      </motion.div>
     </div>
   );
 };
-
-const aiLoadingIcon = (busy) => busy
-  ? <Loader2 className="animate-spin" size={16} />
-  : <Sparkles size={16} />;
 
 export default JobLaunchModal;

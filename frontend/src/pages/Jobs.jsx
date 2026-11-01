@@ -66,12 +66,12 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl bg-surface rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(64,52,61,0.2)] z-[1002] border border-purple-500/30 overflow-hidden"
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-2xl bg-[#0d1117] rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[1002] border border-purple-500/30 overflow-hidden"
     >
       <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-purple-500 via-pink-500 to-primary" />
 
       {/* Header */}
-      <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] border-b border-ink/10">
+      <div className="px-6 py-4 flex items-center justify-between bg-white/[0.02] border-b border-white/5">
         <div className="flex items-center gap-2.5">
           <div className="p-2 bg-purple-500/20 text-purple-400 rounded-lg">
             <Bot size={20} />
@@ -114,7 +114,7 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
                 </span>
                 <span className="text-xs text-text-dim">Severity: <strong className="uppercase text-white">{analysis.severity || 'high'}</strong></span>
               </div>
-              <p className="text-white text-[0.95rem] font-medium leading-relaxed bg-white/[0.02] p-3.5 rounded-xl border border-ink/10">
+              <p className="text-white text-[0.95rem] font-medium leading-relaxed bg-white/[0.02] p-3.5 rounded-xl border border-white/5">
                 {analysis.summary}
               </p>
             </div>
@@ -123,7 +123,7 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
             {analysis.rootCauseSnippet && (
               <div className="flex flex-col gap-1.5">
                 <span className="text-xs font-bold text-text-dim uppercase tracking-wider">Identified Root Cause Snippet</span>
-                <div className="p-3 bg-surface-muted rounded-xl border border-ink/15 font-mono text-xs text-red-400 overflow-x-auto whitespace-pre-wrap">
+                <div className="p-3 bg-black/60 rounded-xl border border-white/10 font-mono text-xs text-red-400 overflow-x-auto whitespace-pre-wrap">
                   {analysis.rootCauseSnippet}
                 </div>
               </div>
@@ -135,9 +135,9 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
                 <span className="text-xs font-bold text-text-dim uppercase tracking-wider flex items-center gap-1.5">
                   <Wrench size={14} className="text-primary" /> Recommended Solutions
                 </span>
-                <div className="bg-white/[0.02] border border-ink/10 rounded-xl p-4 flex flex-col gap-2">
+                <div className="bg-white/[0.02] border border-white/5 rounded-xl p-4 flex flex-col gap-2">
                   {analysis.fixes.map((fix, idx) => (
-                    <div key={idx} className="flex items-start gap-2 text-xs text-text-dim">
+                    <div key={idx} className="flex items-start gap-2 text-xs text-[#c9d1d9]">
                       <span className="text-success font-bold mt-0.5">•</span>
                       <span>{fix}</span>
                     </div>
@@ -147,7 +147,7 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
             )}
 
             {/* Actions */}
-            <div className="flex items-center justify-between pt-2 border-t border-ink/10">
+            <div className="flex items-center justify-between pt-2 border-t border-white/5">
               <button
                 onClick={handleCopySummary}
                 className="px-3 py-2 rounded-xl bg-white/5 hover:bg-white/10 text-xs font-medium text-text-dim hover:text-white flex items-center gap-1.5 transition-all"
@@ -211,9 +211,9 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
       initial={{ opacity: 0, scale: 0.95, y: 20 }}
       animate={{ opacity: 1, scale: 1, y: 0 }}
       exit={{ opacity: 0, scale: 0.95, y: 20 }}
-      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[560px] bg-surface rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(64,52,61,0.2)] z-[1000] border border-ink/15 overflow-hidden"
+      className="fixed top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[90vw] max-w-4xl h-[560px] bg-[#0d1117] rounded-2xl flex flex-col shadow-[0_30px_70px_rgba(0,0,0,0.95)] z-[1000] border border-white/10 overflow-hidden"
     >
-      <div className="px-5 py-3.5 flex items-center justify-between bg-white/[0.03] border-b border-ink/10">
+      <div className="px-5 py-3.5 flex items-center justify-between bg-white/[0.03] border-b border-white/5">
         <div className="flex items-center gap-3">
           <div className="flex gap-2">
             <span className="w-3 h-3 rounded-full bg-[#ff5f56]" />
@@ -246,7 +246,7 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
         </div>
       </div>
 
-      <div className="p-4 flex-1 overflow-y-auto font-mono text-[0.82rem] leading-relaxed text-text-dim bg-surface-muted">
+      <div className="p-4 flex-1 overflow-y-auto font-mono text-[0.82rem] leading-relaxed text-[#c9d1d9] bg-black/40">
         {logs.length === 0 && <div className="text-text-dim animate-pulse">Connecting to live container output stream...</div>}
         {logs.map((log, i) => (
           <div key={i} className="flex gap-3 mb-1">
@@ -349,7 +349,7 @@ const Jobs = () => {
           </button>
           <button
             onClick={fetchJobs}
-            className="flex items-center gap-2 rounded-xl border border-ink/15 bg-white/[0.04] px-3.5 py-2.5 text-xs font-semibold text-white transition-all hover:bg-white/[0.08]"
+            className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-xs font-semibold text-white transition-all hover:bg-white/[0.08]"
           >
             <RefreshCw size={14} /> Refresh
           </button>
@@ -361,7 +361,7 @@ const Jobs = () => {
             { label: 'Queued', count: jobs.filter((job) => job.status === 'queued').length, tone: 'text-accent' },
             { label: 'Completed', count: jobs.filter((job) => job.status === 'completed').length, tone: 'text-primary' },
           ].map((item) => (
-            <div key={item.label} className="rounded-xl border border-ink/15 bg-surface-muted px-3 py-3">
+            <div key={item.label} className="rounded-xl border border-white/[0.07] bg-black/15 px-3 py-3">
               <span className="block font-mono text-[0.58rem] uppercase tracking-wider text-text-dim">{item.label}</span>
               <span className={`mt-1 block text-xl font-semibold ${item.tone}`}>{item.count}</span>
             </div>
@@ -370,7 +370,7 @@ const Jobs = () => {
       </section>
 
       <div className="glass-card overflow-hidden">
-        <div className="flex items-center justify-between border-b border-ink/15 px-4 py-3 sm:px-5">
+        <div className="flex items-center justify-between border-b border-white/[0.07] px-4 py-3 sm:px-5">
           <span className="text-sm font-medium text-white">Deployment activity</span>
           <span className="font-mono text-[0.6rem] uppercase tracking-wider text-text-dim">Auto-refresh · 15 sec</span>
         </div>
@@ -390,12 +390,12 @@ const Jobs = () => {
           <table className="w-full text-left border-collapse">
             <thead>
               <tr>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">ID</th>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Status</th>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">GPU resource</th>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Launched at</th>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Cost</th>
-                <th className="border-b border-ink/15 p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Actions</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">ID</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Status</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">GPU resource</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Launched at</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Cost</th>
+                <th className="border-b border-white/[0.07] p-3 text-[0.62rem] font-semibold uppercase tracking-wider text-text-dim">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-white/[0.05]">
@@ -486,7 +486,7 @@ const Jobs = () => {
                       <button
                         onClick={() => setSelectedJob(job)}
                         title="View Live Logs"
-                        className="h-8 px-2.5 rounded-lg bg-surface-hover border border-ink/15 text-text-dim flex items-center gap-1.5 hover:bg-white/10 hover:text-white transition-all text-xs"
+                        className="h-8 px-2.5 rounded-lg bg-surface-hover border border-white/10 text-text-dim flex items-center gap-1.5 hover:bg-white/10 hover:text-white transition-all text-xs"
                       >
                         <TerminalIcon size={14} />
                         Logs
@@ -550,7 +550,7 @@ const Jobs = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-ink/30 backdrop-blur-sm z-[999]"
+              className="fixed inset-0 bg-black/75 backdrop-blur-sm z-[999]"
               onClick={() => setSelectedJob(null)}
             />
             <LogTerminal
@@ -571,7 +571,7 @@ const Jobs = () => {
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="fixed inset-0 bg-ink/30 backdrop-blur-md z-[1001]"
+              className="fixed inset-0 bg-black/80 backdrop-blur-md z-[1001]"
               onClick={() => setExplainingJobId(null)}
             />
             <AiExplainerModal
@@ -605,8 +605,8 @@ const Jobs = () => {
       {/* Migration Graph Modal */}
       <AnimatePresence>
         {migrationModalJob && (
-          <div className="fixed inset-0 z-[1050] flex items-center justify-center p-3 sm:p-6 bg-ink/30 backdrop-blur-md">
-            <div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl bg-surface border border-ink/15 p-2 sm:p-4 shadow-2xl">
+          <div className="fixed inset-0 z-[1050] flex items-center justify-center p-3 sm:p-6 bg-black/80 backdrop-blur-md">
+            <div className="relative w-full max-w-5xl max-h-[92vh] overflow-y-auto rounded-2xl bg-[#0a0d13] border border-white/20 p-2 sm:p-4 shadow-2xl">
               <button
                 onClick={() => setMigrationModalJob(null)}
                 className="absolute top-4 right-4 z-30 p-2 text-text-dim hover:text-white rounded-xl bg-white/5 hover:bg-white/10 transition-all"

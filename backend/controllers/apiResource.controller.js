@@ -247,5 +247,3 @@ export const getUsageStats = async (req, res, next) => {
     next(error);
   }
 };
-
-

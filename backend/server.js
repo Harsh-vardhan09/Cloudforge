@@ -23,12 +23,6 @@ import { startLeaseMonitor } from "./controllers/jobs.controller.js";
 
 const app = express();
 const httpServer = createServer(app);
-const frontendOrigins = new Set([
-  ...(process.env.FRONTEND_URL || "").split(",").map((origin) => origin.trim()).filter(Boolean),
-  ...(process.env.NODE_ENV !== "production"
-    ? ["http://localhost:5173", "http://127.0.0.1:5173"]
-    : []),
-]);
 
 // --- Security & Parsing Middleware ---
 app.use(
@@ -39,13 +33,7 @@ app.use(
 );
 app.use(
   cors({
-    origin: (origin, callback) => {
-      if (!origin || frontendOrigins.has(origin)) {
-        callback(null, true);
-        return;
-      }
-      callback(new Error("Origin is not allowed by CORS"));
-    },
+    origin: process.env.FRONTEND_URL || "http://localhost:3000",
     methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
     credentials: true,
@@ -77,7 +65,7 @@ app.get("/health", (_req, res) =>
 app.use(Errorhandler);
 
 // --- Initialize and Start ---
-const PORT = process.env.PORT || 5000;
+const PORT = process.env.PORT || 3000;
 
 httpServer.listen(PORT, async () => {
   logger.info(`🚀 Server running on http://localhost:${PORT}`);

@@ -32,15 +32,6 @@ const Billing = () => {
 
     try {
       setAddingFunds(true);
-      if (data.demoPaymentsEnabled) {
-        const { data: result } = await api.post('/billing/demo-topup', {
-          amount: Number(amountInINR),
-        });
-        await Promise.all([fetchBillingData(), fetchUser()]);
-        alert(`${result.message} ${result.creditsAdded} CR added.`);
-        return;
-      }
-
       // 1. Create order on backend
       const { data: order } = await api.post('/billing/order', { amount: parseFloat(amountInINR) });
 
@@ -78,7 +69,7 @@ const Billing = () => {
       rzp.open();
     } catch (err) {
       console.error("Razorpay error:", err);
-      alert(err.response?.data?.message || "Failed to initiate payment.");
+      alert("Failed to initiate payment.");
     } finally {
       setAddingFunds(false);
     }
@@ -121,21 +112,14 @@ const Billing = () => {
             </h2>
             
             <div className="mt-7 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">
-                {data.demoPaymentsEnabled ? 'Add Demo Credits (1 INR = 1 CR)' : 'Buy Credits (1 INR = 1 CR)'}
-              </span>
-              {data.demoPaymentsEnabled && (
-                <p className="rounded-lg border border-amber-400/30 bg-amber-400/10 px-3 py-2 text-xs text-amber-200" role="status">
-                  Development simulation only. No real payment is made; these credits are for local testing.
-                </p>
-              )}
+              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">Buy Credits (1 INR = 1 CR)</span>
               <div className="flex flex-wrap items-center gap-2">
                 {[500, 1000, 5000].map(amt => (
                   <button
                     key={amt}
                     onClick={() => initiatePayment(amt)}
                     disabled={addingFunds}
-                    className="flex-1 rounded-lg border border-ink/15 bg-white/5 py-2 px-3 text-sm font-medium text-white hover:bg-white/10 hover:border-primary/50 transition-colors"
+                    className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 px-3 text-sm font-medium hover:bg-white/10 hover:border-primary/50 transition-colors"
                   >
                     ₹{amt}
                   </button>
@@ -150,7 +134,7 @@ const Billing = () => {
                     placeholder="Custom Amount"
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    className="w-full rounded-lg border border-ink/15 bg-white/5 py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                    className="w-full rounded-lg border border-white/10 bg-white/5 py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-white"
                   />
                 </div>
                 <button
@@ -189,40 +173,38 @@ const Billing = () => {
       </div>
 
       <div className="glass-card flex min-w-0 flex-col p-5 sm:p-6">
-        <div className="mb-5 flex items-center justify-between border-b border-ink/15 pb-4">
+        <div className="mb-5 flex items-center justify-between border-b border-white/[0.08] pb-4">
           <div>
             <span className="eyebrow">Account activity</span>
             <h3 className="mt-1 text-lg font-semibold">Transaction & Usage History</h3>
           </div>
-          <span className="rounded-full border border-ink/15 bg-white/[0.03] px-3 py-1.5 font-mono text-[0.62rem] text-text-dim">
+          <span className="rounded-full border border-white/[0.08] bg-white/[0.03] px-3 py-1.5 font-mono text-[0.62rem] text-text-dim">
             {data.transactions.length} total
           </span>
         </div>
 
         <div className="flex max-h-[560px] flex-1 flex-col gap-2 overflow-y-auto pr-1">
           {data.transactions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-ink/15 py-14 text-text-dim">
+            <div className="flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 py-14 text-text-dim">
                <History size={32} className="mb-3 text-primary/50" />
                <span className="text-sm font-medium text-white">Nothing here yet</span>
                <span className="mt-1 text-xs">Your deposits and usage will show up here.</span>
             </div>
           ) : (
             data.transactions.map((tx) => (
-              <div key={tx._id} className="flex flex-wrap items-center gap-3 rounded-xl border border-transparent bg-white/[0.02] p-3.5 transition-all hover:border-ink/15 hover:bg-white/[0.04] sm:flex-nowrap sm:gap-4">
+              <div key={tx._id} className="flex flex-wrap items-center gap-3 rounded-xl border border-transparent bg-white/[0.02] p-3.5 transition-all hover:border-white/[0.07] hover:bg-white/[0.04] sm:flex-nowrap sm:gap-4">
                 <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl
                   ${tx.type === 'deposit' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'}`}>
                   {tx.type === 'deposit' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium capitalize text-white">
-                    {tx.type} {tx.paymentProvider === 'demo' ? '· DEMO' : tx.razorpayPaymentId ? `· ${tx.razorpayPaymentId.substring(0,8)}` : ''}
-                  </span>
+                  <span className="truncate text-sm font-medium capitalize text-white">{tx.type} {tx.razorpayPaymentId ? `· ${tx.razorpayPaymentId.substring(0,8)}` : ''}</span>
                   <span className="mt-0.5 text-[0.68rem] text-text-dim">{new Date(tx.createdAt).toLocaleString()}</span>
                 </div>
                 <span className={`ml-auto font-mono text-sm font-semibold ${tx.type === 'deposit' ? 'text-success' : 'text-error'}`}>
                   {tx.type === 'deposit' ? '+' : '-'}{tx.type === 'deposit' ? tx.creditsAdded : tx.amount?.toFixed(2)} CR
                 </span>
-                <div className={`rounded-full border px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-wider ${tx.status === 'completed' ? 'border-success/15 bg-success/5 text-success' : 'border-ink/15 bg-white/[0.03] text-text-dim'}`}>
+                <div className={`rounded-full border px-2 py-1 text-[0.58rem] font-semibold uppercase tracking-wider ${tx.status === 'completed' ? 'border-success/15 bg-success/5 text-success' : 'border-white/10 bg-white/[0.03] text-text-dim'}`}>
                   {tx.status}
                 </div>
               </div>

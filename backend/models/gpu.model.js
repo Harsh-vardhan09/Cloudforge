@@ -59,19 +59,6 @@ const GPUSchema = new mongoose.Schema(
     maxVram: {
       type: Number, // Host set limit
     },
-    lastTelemetry: {
-      type: mongoose.Schema.Types.Mixed,  // latest full snapshot
-      default: null,
-    },
-    telemetrySafetyLevel: {
-      type: String,
-      enum: ["ok", "warning", "critical"],
-      default: "ok",
-    },
-    telemetryAlerts: {
-      type: [String],
-      default: [],
-    },
   },
   { timestamps: true }
 );

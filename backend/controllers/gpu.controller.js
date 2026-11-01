@@ -1,5 +1,4 @@
 import GPU from "../models/gpu.model.js";
-import { emitGpuTelemetry } from "../utils/socket.js";
 import {
   describeDisallowedAgentIp,
   isAllowedAgentPort,
@@ -157,46 +156,3 @@ export const setOffline = async (req, res, next) => {
 };
 
 // PATCH /api/gpu/:id/offline — mark GPU as offline
-
-// POST /api/gpu/telemetry — agent streams live hardware telemetry while a job runs
-export const receiveTelemetry = async (req, res, next) => {
-  try {
-    const snapshot = req.body;
-    if (!snapshot || typeof snapshot !== "object") {
-      return res.status(400).json({ message: "Invalid telemetry payload" });
-    }
-
-    const safety = snapshot.safety || {};
-    const safetyLevel = ["ok", "warning", "critical"].includes(safety.level)
-      ? safety.level
-      : "ok";
-
-    // Persist the latest snapshot to Mongo (overwrite, not append)
-    const gpu = await GPU.findOneAndUpdate(
-      { host: req.user.id },
-      {
-        $set: {
-          lastTelemetry:        snapshot,
-          telemetrySafetyLevel: safetyLevel,
-          telemetryAlerts:      safety.alerts ?? [],
-          lastSeen:             new Date(),
-        },
-      },
-      { new: true }
-    );
-
-    if (!gpu) {
-      return res.status(404).json({ message: "GPU not registered for this account" });
-    }
-
-    // Broadcast in real time to the owner's browser
-    emitGpuTelemetry(String(req.user.id), {
-      ...snapshot,
-      gpuId: String(gpu._id),
-    });
-
-    return res.status(200).json({ ok: true, safetyLevel });
-  } catch (error) {
-    next(error);
-  }
-};

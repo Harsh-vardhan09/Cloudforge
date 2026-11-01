@@ -3,50 +3,30 @@ import { S3Client, CreateBucketCommand, PutPublicAccessBlockCommand, PutBucketCo
 import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
-import { fileURLToPath } from 'url';
 
 const accessKeyId = process.env.OBJECT_STORAGE_ACCESS_KEY_ID;
 const secretAccessKey = process.env.OBJECT_STORAGE_SECRET_ACCESS_KEY;
-const region = process.env.OBJECT_STORAGE_REGION || process.env.AWS_REGION || "us-east-1";
-const scriptDir = path.dirname(fileURLToPath(import.meta.url));
-const envPath = path.resolve(scriptDir, "../.env");
+const region = process.env.OBJECT_STORAGE_REGION || process.env.AWS_REGION || "ap-south-1";
 
-if (Boolean(accessKeyId) !== Boolean(secretAccessKey)) {
-  console.error("Set both OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY, or use the AWS credential provider chain.");
-  process.exit(1);
-}
-
-if (!fs.existsSync(envPath)) {
-  console.error("Create the repository-root .env file before running this script.");
-  process.exit(1);
-}
-
-const frontendOrigins = (process.env.FRONTEND_URL || "http://localhost:5173,http://127.0.0.1:5173")
-  .split(",")
-  .map((origin) => origin.trim())
-  .filter(Boolean);
-
-if (frontendOrigins.some((origin) => !/^https?:\/\/[^/]+$/i.test(origin))) {
-  console.error("FRONTEND_URL must contain comma-separated origins without paths.");
+if (!accessKeyId || !secretAccessKey) {
+  console.error("Set OBJECT_STORAGE_ACCESS_KEY_ID and OBJECT_STORAGE_SECRET_ACCESS_KEY in .env before running this script.");
   process.exit(1);
 }
 
 const client = new S3Client({
   region,
-  ...(accessKeyId ? { credentials: { accessKeyId, secretAccessKey } } : {}),
+  credentials: { accessKeyId, secretAccessKey }
 });
 
-const randomId = crypto.randomBytes(8).toString('hex');
-const bucketName = `computesharing-storage-${randomId}`;
+const randomId = crypto.randomBytes(4).toString('hex');
+const bucketName = `hellosharing-storage-${randomId}`;
 
 async function main() {
   try {
     console.log(`Creating bucket: ${bucketName} in ${region}...`);
     await client.send(new CreateBucketCommand({
       Bucket: bucketName,
-      ...(region === "us-east-1"
-        ? {}
-        : { CreateBucketConfiguration: { LocationConstraint: region } }),
+      CreateBucketConfiguration: { LocationConstraint: region }
     }));
     
     console.log('Setting Public Access Block...');
@@ -68,8 +48,7 @@ async function main() {
           {
             AllowedHeaders: ["*"],
             AllowedMethods: ["GET", "PUT", "POST", "HEAD"],
-            AllowedOrigins: frontendOrigins,
-            MaxAgeSeconds: 3000,
+            AllowedOrigins: ["*"],
             ExposeHeaders: ["ETag"]
           }
         ]
@@ -79,12 +58,9 @@ async function main() {
     console.log('Bucket created successfully!');
     
     // Read and update the .env file
+    const envPath = path.resolve('../.env');
     let envContent = fs.readFileSync(envPath, 'utf8');
-    if (/^OBJECT_STORAGE_BUCKET=.*$/m.test(envContent)) {
-      envContent = envContent.replace(/^OBJECT_STORAGE_BUCKET=.*$/m, `OBJECT_STORAGE_BUCKET=${bucketName}`);
-    } else {
-      envContent += `\nOBJECT_STORAGE_BUCKET=${bucketName}\n`;
-    }
+    envContent = envContent.replace(/OBJECT_STORAGE_BUCKET=.*/, `OBJECT_STORAGE_BUCKET=${bucketName}`);
     fs.writeFileSync(envPath, envContent);
     console.log('.env updated successfully with bucket name.');
 

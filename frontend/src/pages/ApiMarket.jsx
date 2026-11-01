@@ -5,7 +5,7 @@ import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
-  <motion.div
+  <motion.div 
     layout
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -20,20 +20,20 @@ const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
         <span className="text-[0.7rem] text-text-dim uppercase tracking-tighter">Provided by {resource.host?.name}</span>
       </div>
       <div className="flex flex-col items-end gap-2">
-        <div className="px-2.5 py-1 rounded-full text-[0.65rem] font-extrabold uppercase tracking-widest bg-success/10 text-success border border-success/20">
+        <div className="px-2.5 py-1 rounded-full text-[0.65rem] font-black uppercase tracking-widest bg-success/10 text-success border border-success/20">
           {resource.status || 'Active'}
         </div>
         {onEdit && (
           <div className="flex gap-2">
-            <button
-              onClick={(e) => { e.stopPropagation(); onEdit(resource); }}
+            <button 
+              onClick={(e) => { e.stopPropagation(); onEdit(resource); }} 
               className="p-2 rounded-lg bg-primary/10 hover:bg-primary text-primary hover:text-white transition-all border border-primary/20"
               title="Edit Resource"
             >
               <Pencil size={12} />
             </button>
-            <button
-              onClick={(e) => { e.stopPropagation(); onDelete(resource._id); }}
+            <button 
+              onClick={(e) => { e.stopPropagation(); onDelete(resource._id); }} 
               className="p-2 rounded-lg bg-error/10 hover:bg-error text-error hover:text-white transition-all border border-error/20"
               title="Delete Resource"
             >
@@ -44,7 +44,7 @@ const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
       </div>
     </div>
 
-    <div className="flex gap-4 py-4 border-y border-ink/10 mb-4">
+    <div className="flex gap-4 py-4 border-y border-white/5 mb-4">
       <div className="flex-1">
         <p className="text-[0.6rem] text-text-dim uppercase font-bold mb-1">Provider</p>
         <p className="text-sm font-semibold capitalize flex items-center gap-2">
@@ -67,7 +67,7 @@ const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
       </div>
     </div>
 
-    <button
+    <button 
       onClick={() => onRent(resource)}
       className="w-full py-3 rounded-xl bg-primary/10 text-primary font-bold hover:bg-primary hover:text-white transition-all flex items-center justify-center gap-2 group"
     >
@@ -100,14 +100,14 @@ const RentedApiCard = ({ resource }) => {
   }, [resource.activeRental?.expiresAt]);
 
   return (
-    <motion.div
+    <motion.div 
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="p-8 glass-card bg-gradient-to-br from-success/5 to-primary/5 border-success/30 flex flex-col gap-6"
     >
       <div className="flex justify-between items-center">
         <div>
-          <h4 className="text-xl font-extrabold flex items-center gap-2">
+          <h4 className="text-xl font-black flex items-center gap-2">
             {resource.name}
             <div className="px-2 py-0.5 rounded bg-success text-[0.6rem] text-white uppercase">Active Access</div>
           </h4>
@@ -120,15 +120,15 @@ const RentedApiCard = ({ resource }) => {
       </div>
 
     <div className="flex flex-col gap-4">
-       <div className="p-4 bg-surface-muted rounded-xl border border-ink/10">
+       <div className="p-4 bg-black/40 rounded-xl border border-white/5">
           <label className="text-[0.6rem] font-bold text-text-dim uppercase flex items-center gap-2 mb-2">
             <ExternalLink size={10} /> Your Proxy Endpoint
           </label>
-          <div className="flex items-center justify-between gap-3 bg-white/5 p-2 px-3 rounded-lg border border-ink/10 group">
+          <div className="flex items-center justify-between gap-3 bg-white/5 p-2 px-3 rounded-lg border border-white/5 group">
              <code className="text-xs text-primary font-mono truncate">
                {window.location.origin}/api/resource/proxy/{resource._id}
              </code>
-             <button
+             <button 
                onClick={() => navigator.clipboard.writeText(`${window.location.origin}/api/resource/proxy/${resource._id}`)}
                className="text-[0.6rem] font-bold uppercase hover:text-white transition-colors"
              >
@@ -169,7 +169,7 @@ const ApiMarket = () => {
   const [rentHours, setRentHours] = useState(1);
   const [paying, setPaying] = useState(false);
   const [editingId, setEditingId] = useState(null);
-  const [formData, setFormData] = useState({
+  const [formData, setFormData] = useState({ 
     name: '', provider: 'openai', customProviderName: '', apiKey: '', hourlyRate: 0.1, tokenRate: 1.0, billingCycle: 'hourly'
   });
 
@@ -271,23 +271,23 @@ const ApiMarket = () => {
       <header className="flex justify-between items-center">
         <div className="flex flex-col gap-4">
           <div>
-            <h1 className="text-3xl font-extrabold tracking-tighter">AI Models & API Gateway</h1>
+            <h1 className="text-3xl font-black tracking-tighter">AI Models & API Gateway</h1>
             <p className="text-text-dim mt-1">Rent high-end LLM tokens securely without exposing keys.</p>
           </div>
           <div className="flex bg-surface-hover glass-card rounded-xl p-1 w-fit">
-            <button
+            <button 
               onClick={() => setViewFilter('all')}
               className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${viewFilter === 'all' ? 'bg-primary text-white shadow-glow' : 'text-text-dim hover:text-white'}`}
             >
               Public Market
             </button>
-            <button
+            <button 
               onClick={() => setViewFilter('mine')}
               className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${viewFilter === 'mine' ? 'bg-primary text-white shadow-glow' : 'text-text-dim hover:text-white'}`}
             >
               My Listings
             </button>
-            <button
+            <button 
               onClick={() => setViewFilter('rented')}
               className={`px-6 py-2 rounded-lg text-xs font-bold transition-all ${viewFilter === 'rented' ? 'bg-primary text-white shadow-glow' : 'text-text-dim hover:text-white'}`}
             >
@@ -295,7 +295,7 @@ const ApiMarket = () => {
             </button>
           </div>
         </div>
-        <button
+        <button 
           onClick={() => setShowRegister(true)}
           className="glow-btn flex items-center gap-2 px-6 py-3"
         >
@@ -316,14 +316,14 @@ const ApiMarket = () => {
              viewFilter === 'rented' ? (
                <RentedApiCard key={res._id} resource={res} />
              ) : (
-               <ApiCard
-                 key={res._id}
-                 resource={res}
-                 onRent={() => { setSelectedForRent(res); setShowRentModal(true); }}
-                 onEdit={(res.host?._id || res.host) === (user?._id || user?.id) ? (r) => {
-                   setFormData({ name: r.name, provider: r.provider, customProviderName: r.customProviderName, apiKey: '', hourlyRate: r.hourlyRate, tokenRate: r.tokenRate, billingCycle: r.billingCycle || 'hourly' });
+               <ApiCard 
+                 key={res._id} 
+                 resource={res} 
+                 onRent={() => { setSelectedForRent(res); setShowRentModal(true); }} 
+                 onEdit={(res.host?._id || res.host) === (user?._id || user?.id) ? (r) => { 
+                   setFormData({ name: r.name, provider: r.provider, customProviderName: r.customProviderName, apiKey: '', hourlyRate: r.hourlyRate, tokenRate: r.tokenRate, billingCycle: r.billingCycle || 'hourly' }); 
                    setEditingId(r._id);
-                   setShowRegister(true);
+                   setShowRegister(true); 
                  } : null}
                  onDelete={(res.host?._id || res.host) === (user?._id || user?.id) ? handleDelete : null}
                />
@@ -336,12 +336,12 @@ const ApiMarket = () => {
       <AnimatePresence>
         {showRentModal && selectedForRent && (
           <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-ink/30 backdrop-blur-md"
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
               onClick={() => setShowRentModal(false)}
             />
-            <motion.div
+            <motion.div 
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="glass-card w-full max-w-sm p-8 relative flex flex-col gap-6"
             >
@@ -359,25 +359,25 @@ const ApiMarket = () => {
               <div className="flex flex-col gap-2">
                  <label className="text-[0.7rem] font-bold text-text-dim uppercase">Rental Duration (Hours)</label>
                  <div className="flex items-center gap-4">
-                    <input
+                    <input 
                        type="range" min="1" max="24" step="1"
-                       className="flex-1 accent-primary h-2 bg-white/10 rounded-lg appearance-none cursor-pointer"
+                       className="flex-1 accent-primary h-2 bg-white/10 rounded-lg appearance-none cursor-pointer" 
                        value={rentHours} onChange={e => setRentHours(parseInt(e.target.value))}
                     />
                     <span className="w-10 text-center font-bold text-primary">{rentHours}h</span>
                  </div>
               </div>
 
-              <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-ink/10">
+              <div className="flex justify-between items-center p-4 bg-white/5 rounded-xl border border-white/5">
                  <div className="flex flex-col">
                     <p className="text-[0.6rem] text-text-dim uppercase font-bold">Total Cost</p>
-                    <p className="text-xl font-extrabold text-success">${(selectedForRent.hourlyRate * rentHours).toFixed(2)}</p>
+                    <p className="text-xl font-black text-success">${(selectedForRent.hourlyRate * rentHours).toFixed(2)}</p>
                  </div>
                  <CreditCard className="text-text-dim opacity-20" size={32} />
               </div>
 
               <div className="flex flex-col gap-3">
-                <button
+                <button 
                   onClick={handlePayAndRent}
                   disabled={paying}
                   className="glow-btn py-4 font-bold flex items-center justify-center gap-2"
@@ -389,7 +389,7 @@ const ApiMarket = () => {
                     </>
                   )}
                 </button>
-                <button
+                <button 
                   onClick={handleRent}
                   className="py-3 text-sm font-bold text-text-dim hover:text-white transition-all bg-white/5 rounded-xl"
                 >
@@ -405,12 +405,12 @@ const ApiMarket = () => {
       <AnimatePresence>
         {showRegister && (
           <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
-            <motion.div
+            <motion.div 
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
-              className="absolute inset-0 bg-ink/30 backdrop-blur-md"
+              className="absolute inset-0 bg-black/80 backdrop-blur-md"
               onClick={() => { setShowRegister(false); setEditingId(null); }}
             />
-            <motion.form
+            <motion.form 
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               onSubmit={handleRegister}
               className="glass-card w-full max-md p-8 relative flex flex-col gap-6"
@@ -419,11 +419,11 @@ const ApiMarket = () => {
                 <h3 className="text-xl font-bold">{editingId ? 'Update API Resource' : 'List API Resource'}</h3>
                 <button type="button" onClick={() => { setShowRegister(false); setEditingId(null); }}><X size={20} /></button>
               </div>
-
+              
               <div className="flex flex-col gap-2">
                  <label className="text-[0.7rem] font-bold text-text-dim uppercase">Resource Name</label>
-                 <input
-                    type="text" className="bg-white/5 border border-ink/15 p-3 rounded-xl focus:border-primary outline-none"
+                 <input 
+                    type="text" className="bg-white/5 border border-white/10 p-3 rounded-xl focus:border-primary outline-none" 
                     placeholder="e.g. GPT-4 High Priority" required
                     value={formData.name} onChange={e => setFormData({...formData, name: e.target.value})}
                  />
@@ -431,8 +431,8 @@ const ApiMarket = () => {
 
               <div className="flex flex-col gap-2">
                  <label className="text-[0.7rem] font-bold text-text-dim uppercase">Provider</label>
-                 <select
-                    className="bg-white/5 border border-ink/15 p-3 rounded-xl focus:border-primary outline-none"
+                 <select 
+                    className="bg-white/5 border border-white/10 p-3 rounded-xl focus:border-primary outline-none"
                     value={formData.provider} onChange={e => setFormData({...formData, provider: e.target.value})}
                  >
                     <option value="openai">OpenAI</option>
@@ -445,8 +445,8 @@ const ApiMarket = () => {
               {formData.provider === 'custom' && (
                 <div className="flex flex-col gap-2 animate-in fade-in slide-in-from-top-2">
                    <label className="text-[0.7rem] font-bold text-text-dim uppercase">Provider Name</label>
-                   <input
-                      type="text" className="bg-white/5 border border-ink/15 p-3 rounded-xl focus:border-primary outline-none"
+                   <input 
+                      type="text" className="bg-white/5 border border-white/10 p-3 rounded-xl focus:border-primary outline-none" 
                       placeholder="e.g. Mistral, DeepSeek, MyService" required
                       value={formData.customProviderName} onChange={e => setFormData({...formData, customProviderName: e.target.value})}
                    />
@@ -457,8 +457,8 @@ const ApiMarket = () => {
                  <label className="text-[0.7rem] font-bold text-text-dim uppercase">API Key (Securely Encrypted)</label>
                  <div className="relative">
                     <Key className="absolute left-3 top-3.5 text-text-dim" size={16} />
-                    <input
-                       type="password" className="bg-white/5 border border-ink/15 p-3 pl-10 rounded-xl w-full focus:border-primary outline-none"
+                    <input 
+                       type="password" className="bg-white/5 border border-white/10 p-3 pl-10 rounded-xl w-full focus:border-primary outline-none" 
                        placeholder="sk-..." required
                        value={formData.apiKey} onChange={e => setFormData({...formData, apiKey: e.target.value})}
                     />
@@ -468,16 +468,16 @@ const ApiMarket = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div className="flex flex-col gap-2">
                    <label className="text-[0.7rem] font-bold text-text-dim uppercase">Hourly Rate ($)</label>
-                   <input
-                      type="number" step="0.01" className="bg-white/5 border border-ink/15 p-3 rounded-xl focus:border-primary outline-none"
+                   <input 
+                      type="number" step="0.01" className="bg-white/5 border border-white/10 p-3 rounded-xl focus:border-primary outline-none" 
                       required
                       value={formData.hourlyRate} onChange={e => setFormData({...formData, hourlyRate: e.target.value})}
                    />
                 </div>
                 <div className="flex flex-col gap-2">
                    <label className="text-[0.7rem] font-bold text-text-dim uppercase">Price / 1M Tokens ($)</label>
-                   <input
-                      type="number" step="0.1" className="bg-white/5 border border-ink/15 p-3 rounded-xl focus:border-primary outline-none"
+                   <input 
+                      type="number" step="0.1" className="bg-white/5 border border-white/10 p-3 rounded-xl focus:border-primary outline-none" 
                       required
                       value={formData.tokenRate} onChange={e => setFormData({...formData, tokenRate: e.target.value})}
                    />

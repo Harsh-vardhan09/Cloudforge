@@ -61,12 +61,12 @@ const Login = () => {
           </p>
 
           <div className="mt-10 grid max-w-xl grid-cols-2 gap-3">
-            <div className="rounded-2xl border border-ink/15 bg-white/[0.025] p-4">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
               <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary"><Zap size={16} /></div>
               <div className="text-sm font-semibold text-white">On-demand power</div>
               <div className="mt-1 text-xs leading-5 text-text-dim">Find the right GPU for every workload.</div>
             </div>
-            <div className="rounded-2xl border border-ink/15 bg-white/[0.025] p-4">
+            <div className="rounded-2xl border border-white/[0.08] bg-white/[0.025] p-4">
               <div className="mb-3 flex h-8 w-8 items-center justify-center rounded-lg bg-accent/10 text-accent"><ShieldCheck size={16} /></div>
               <div className="text-sm font-semibold text-white">Built to connect</div>
               <div className="mt-1 text-xs leading-5 text-text-dim">A distributed marketplace for compute.</div>
@@ -154,12 +154,12 @@ const Login = () => {
             <fieldset className="mb-1">
               <legend className="mb-2 text-xs font-medium text-text-dim">How will you use ComputeGrid?</legend>
               <div className="flex gap-3">
-               <label className={`flex flex-1 cursor-pointer flex-col rounded-xl border p-3.5 transition-all ${formData.role === 'user' ? 'border-primary/50 bg-primary/[0.08]' : 'border-ink/15 bg-white/[0.025] hover:border-ink/15'}`}>
+               <label className={`flex flex-1 cursor-pointer flex-col rounded-xl border p-3.5 transition-all ${formData.role === 'user' ? 'border-primary/50 bg-primary/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'}`}>
                   <input type="radio" value="user" name="role" className="sr-only" checked={formData.role === 'user'} onChange={() => setFormData({...formData, role: 'user'})} />
                   <span className="text-xs font-semibold text-white">Rent compute</span>
                   <span className="mt-1 text-[0.65rem] text-text-dim">Run jobs on GPUs</span>
                </label>
-               <label className={`flex flex-1 cursor-pointer flex-col rounded-xl border p-3.5 transition-all ${formData.role === 'host' ? 'border-primary/50 bg-primary/[0.08]' : 'border-ink/15 bg-white/[0.025] hover:border-ink/15'}`}>
+               <label className={`flex flex-1 cursor-pointer flex-col rounded-xl border p-3.5 transition-all ${formData.role === 'host' ? 'border-primary/50 bg-primary/[0.08]' : 'border-white/10 bg-white/[0.025] hover:border-white/20'}`}>
                   <input type="radio" value="host" name="role" className="sr-only" checked={formData.role === 'host'} onChange={() => setFormData({...formData, role: 'host'})} />
                   <span className="text-xs font-semibold text-white">Share a GPU</span>
                   <span className="mt-1 text-[0.65rem] text-text-dim">Host your hardware</span>
@@ -203,13 +203,13 @@ const Login = () => {
                 setLoading(false);
               }
             }}
-            className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-ink/15 bg-white/[0.025] py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.05]"
+            className="mt-2 w-full flex items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.025] py-3 text-sm font-semibold text-white transition-colors hover:bg-white/[0.05]"
           >
             Demo Login
           </button>
           </form>
 
-          <div className="mt-7 border-t border-ink/15 pt-5 text-center text-xs">
+          <div className="mt-7 border-t border-white/[0.08] pt-5 text-center text-xs">
             <span className="text-text-dim">
               {isLogin ? "New to ComputeGrid?" : 'Already have an account?'}
             </span>

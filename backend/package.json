@@ -7,7 +7,6 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "create-bucket": "node create_bucket.js",
     "test": "echo \"No test suite is configured yet\" && exit 1"
   },
   "keywords": [

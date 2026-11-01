@@ -99,19 +99,3 @@ export const emitJobMigration = (jobId, migrationData) => {
   }
 };
 
-/**
- * Emit a hardware telemetry snapshot to the GPU owner's private room.
- * Also broadcasts a safety alert event when level is warning/critical.
- */
-export const emitGpuTelemetry = (hostUserId, snapshot) => {
-  _io?.to(`user:${hostUserId}`).emit("gpu:telemetry", snapshot);
-  const level = snapshot?.safety?.level;
-  if (level === "warning" || level === "critical") {
-    _io?.to(`user:${hostUserId}`).emit("gpu:safety_alert", {
-      level,
-      alerts: snapshot?.safety?.alerts ?? [],
-      jobId:  snapshot?.jobId,
-      timestamp: snapshot?.timestamp,
-    });
-  }
-};
