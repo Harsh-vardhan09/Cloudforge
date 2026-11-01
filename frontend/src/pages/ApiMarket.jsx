@@ -267,7 +267,7 @@ const ApiMarket = () => {
   };
 
   return (
-    <div className="flex flex-col gap-10">
+    <div className="page-api-market flex flex-col gap-10">
       <header className="flex justify-between items-center">
         <div className="flex flex-col gap-4">
           <div>

@@ -63,7 +63,7 @@ const ApiPlayground = () => {
     };
 
     return (
-        <div className="flex flex-col h-[calc(100vh-140px)] gap-6">
+        <div className="page-api-playground flex flex-col h-[calc(100vh-140px)] gap-6">
             <header className="flex justify-between items-center bg-white/[0.02] p-4 px-6 rounded-2xl border border-ink/10 backdrop-blur-md">
                 <div className="flex items-center gap-4">
                     <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center text-primary">

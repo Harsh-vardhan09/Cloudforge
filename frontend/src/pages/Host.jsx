@@ -288,46 +288,69 @@ const Host = () => {
 
   return (
     <div className="flex flex-col gap-6">
-      <header className="glass-card relative overflow-hidden p-5 sm:p-7">
-        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border border-primary/10 shadow-[0_0_0_34px_rgba(197,243,106,0.025)]" />
-        <div className="relative z-[1]">
-        <span className="eyebrow">Contribute to the network</span>
-        <h2 className="mt-2 text-2xl font-semibold tracking-tight sm:text-3xl">Put your GPU to work.</h2>
-        <p className="mt-2 max-w-2xl text-sm leading-6 text-text-dim">
-          Monetize your idle GPU capacity by joining our decentralized network. Run our lightweight agent to start earning $GSHARE tokens or USD.
-        </p>
+      <header className="glass-card relative overflow-hidden border-2 border-ink/80 bg-gradient-to-br from-primary/30 via-accent/20 to-secondary/20 p-5 shadow-[6px_6px_0_#40343d] sm:p-7">
+        <div className="pointer-events-none absolute -right-12 -top-20 h-64 w-64 rounded-full border-2 border-secondary/20 shadow-[0_0_0_24px_rgba(28,120,110,0.05),0_0_0_48px_rgba(232,185,79,0.05)]" />
+        <div className="pointer-events-none absolute -bottom-16 right-1/4 h-40 w-40 rounded-full bg-primary/20 blur-2xl" />
+        <div className="relative z-[1] max-w-3xl">
+          <span className="inline-flex items-center gap-2 rounded-full border border-secondary/30 bg-surface/75 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-secondary">
+            <span className="h-2 w-2 rounded-full bg-secondary" />
+            Contribute to the network
+          </span>
+          <h2 className="mt-3 text-3xl font-extrabold tracking-tight sm:text-4xl">Put your GPU to work.</h2>
+          <p className="mt-2 max-w-2xl text-sm leading-6 text-text-dim">
+            Share spare compute, support real workloads, and earn while your GPU is idle.
+            Install the lightweight agent to join the network.
+          </p>
         </div>
       </header>
 
       <div className="grid grid-cols-1 items-start gap-5 xl:grid-cols-2">
         <div className="flex min-w-0 flex-col gap-4">
-          <div className="glass-card border-secondary/25 bg-secondary/[0.06] p-5 sm:p-6">
-            <h3 className="mb-2 flex items-center gap-2 text-lg font-bold">
-              <Download className="text-secondary" size={20} />
-              Install on Windows
-            </h3>
-            <p className="mb-4 text-sm leading-relaxed text-text-dim">
+          <div className="glass-card relative overflow-hidden border-2 border-secondary/40 bg-gradient-to-br from-secondary/15 via-primary/10 to-accent/20 p-5 shadow-[5px_5px_0_#1c786e] sm:p-6">
+            <div className="pointer-events-none absolute -right-8 -top-10 h-36 w-36 rounded-full border border-secondary/20 shadow-[0_0_0_16px_rgba(28,120,110,0.05)]" />
+            <div className="relative">
+              <h3 className="mb-2 flex items-center gap-2 text-lg font-bold">
+                <span className="flex h-9 w-9 items-center justify-center rounded-xl border border-secondary/25 bg-surface/80 text-secondary shadow-[2px_2px_0_#1c786e]">
+                  <Download size={19} />
+                </span>
+                Install on Windows
+              </h3>
+              <p className="mb-4 text-sm leading-relaxed text-text-dim">
               Download the agent package—no Git or repository clone needed. Extract the ZIP, then double-click
               <code className="mx-1 rounded bg-surface-muted px-1.5 py-0.5 text-text">Install.bat</code>.
               The installer sets up Python dependencies and prompts you to paste your host token.
-            </p>
-            <a
-              href="/downloads/computegrid-gpu-agent-windows-v4.zip"
-              download="computegrid-gpu-agent-windows-v4.zip"
-              className="inline-flex items-center gap-2 rounded-xl border-2 border-ink bg-primary px-4 py-2.5 text-sm font-bold text-text shadow-[3px_3px_0_#40343d] transition-transform hover:-translate-y-0.5"
-            >
-              <Download size={16} />
-              Download Windows installer
-            </a>
-            <p className="mt-3 text-xs leading-relaxed text-text-dim">
+              </p>
+              <div className="mb-4 grid grid-cols-3 gap-2">
+                {['Download', 'Extract', 'Run installer'].map((step, index) => (
+                  <div key={step} className="flex items-center gap-2 rounded-xl border border-ink/10 bg-surface/75 px-2.5 py-2">
+                    <span className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-lg text-[0.65rem] font-extrabold text-text ${
+                      index === 0 ? 'bg-primary' : index === 1 ? 'bg-accent' : 'bg-secondary/30'
+                    }`}>
+                      0{index + 1}
+                    </span>
+                    <span className="text-[0.68rem] font-semibold text-text">{step}</span>
+                  </div>
+                ))}
+              </div>
+              <a
+                href="/downloads/computegrid-gpu-agent-windows-v4.zip"
+                download="computegrid-gpu-agent-windows-v4.zip"
+                className="inline-flex items-center gap-2 rounded-xl border-2 border-ink bg-primary px-4 py-2.5 text-sm font-bold text-text shadow-[3px_3px_0_#40343d] transition-all hover:-translate-y-0.5 hover:bg-accent hover:shadow-[4px_4px_0_#40343d]"
+              >
+                <Download size={16} />
+                Download Windows installer
+                <ArrowRight size={15} />
+              </a>
+              <p className="mt-3 text-xs leading-relaxed text-text-dim">
               Requires Python 3.11–3.13 and Docker Desktop. The installer will use backend
               <code className="mx-1 rounded bg-surface-muted px-1.5 py-0.5 text-text">{backendUrl}</code>;
               if your backend is elsewhere, enter its URL when prompted.
               Keep the installer window open; the token is visible while pasting it.
-            </p>
+              </p>
+            </div>
           </div>
 
-          <div className="glass-card border-primary/15 bg-primary/[0.035] p-5 sm:p-6">
+          <div className="glass-card border-2 border-primary/30 bg-gradient-to-br from-primary/15 via-lavender/10 to-surface p-5 sm:p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Terminal className="text-primary" size={20} />
               Quick Installation
@@ -360,7 +383,7 @@ const Host = () => {
             </p>
           </div>
 
-          <div className="glass-card p-5 sm:p-6">
+          <div className="glass-card border-2 border-accent/30 bg-gradient-to-br from-accent/15 via-primary/10 to-surface p-5 sm:p-6">
             <h3 className="text-lg font-bold mb-4 flex items-center gap-2">
               <Shield className="text-accent" size={20} />
               Personal Access Token
@@ -385,12 +408,12 @@ const Host = () => {
           </div>
 
           <div className="grid grid-cols-2 gap-4">
-             <div className="p-6 glass-card border-ink/10 flex flex-col gap-3">
+             <div className="p-6 glass-card border-2 border-secondary/25 bg-gradient-to-br from-secondary/10 to-surface flex flex-col gap-3">
                 <Shield size={24} className="text-accent" />
                 <h4 className="font-bold text-sm">Secure Isolation</h4>
                 <p className="text-[0.7rem] text-text-dim">Jobs run in hardened Docker containers with zero host filesystem access.</p>
              </div>
-             <div className="p-6 glass-card border-ink/10 flex flex-col gap-3">
+             <div className="p-6 glass-card border-2 border-primary/30 bg-gradient-to-br from-primary/15 to-surface flex flex-col gap-3">
                 <Cpu size={24} className="text-secondary" />
                 <h4 className="font-bold text-sm">Instant Reclaim</h4>
                 <p className="text-[0.7rem] text-text-dim">Need your GPU back? Reclaim saves the latest checkpoint and pauses scheduling on this host.</p>
@@ -398,8 +421,8 @@ const Host = () => {
           </div>
         </div>
 
-        <div className="glass-card flex min-w-0 flex-col overflow-hidden">
-          <div className="p-6 bg-white/[0.03] border-b border-ink/10 flex items-center justify-between">
+        <div className="glass-card flex min-w-0 flex-col overflow-hidden border-2 border-ink/70 shadow-[5px_5px_0_#40343d]">
+          <div className="flex items-center justify-between border-b border-ink/10 bg-gradient-to-r from-secondary/15 via-primary/15 to-accent/20 p-6">
             <h3 className="font-bold">Active Host Metrics</h3>
             <span className={`px-2 py-0.5 rounded text-[0.6rem] font-bold uppercase tracking-widest ${myGpu ? 'bg-success/10 text-success animate-pulse' : 'bg-white/10 text-text-dim'}`}>
               {myGpu ? myGpu.status : 'Offline'}
@@ -408,8 +431,8 @@ const Host = () => {
 
           {myGpu ? (
             <div className="p-8 flex flex-col gap-6">
-              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-ink/10">
-                <div className="p-3 bg-primary/20 rounded-lg text-primary">
+              <div className="flex items-center gap-4 rounded-xl border border-primary/30 bg-gradient-to-r from-primary/15 to-surface p-4">
+              <div className="rounded-xl border border-primary/20 bg-surface p-3 text-primary shadow-[2px_2px_0_#efb4a8]">
                   <Cpu size={24} />
                 </div>
                 <div>
@@ -440,8 +463,8 @@ const Host = () => {
                 </div>
               </div>
 
-              <div className="flex items-center gap-4 p-4 bg-white/5 rounded-xl border border-ink/10">
-                <div className="p-3 bg-accent/20 rounded-lg text-accent">
+              <div className="flex items-center gap-4 rounded-xl border border-accent/30 bg-gradient-to-r from-accent/15 to-surface p-4">
+                <div className="rounded-xl border border-accent/25 bg-surface p-3 text-accent shadow-[2px_2px_0_#e8b94f]">
                   <DollarSign size={24} />
                 </div>
                 <div>
@@ -475,11 +498,11 @@ const Host = () => {
               </div>
 
               <div className="mt-4 grid grid-cols-2 gap-4">
-                 <div className="text-center">
+                 <div className="rounded-xl border border-lavender/25 bg-lavender/10 p-3 text-center">
                     <p className="text-[0.6rem] text-text-dim uppercase font-bold">Utilization</p>
                     <p className="text-xl font-bold">{myGpu.metrics?.gpu_util || 0}%</p>
                  </div>
-                 <div className="text-center">
+                 <div className="rounded-xl border border-success/20 bg-success/10 p-3 text-center">
                     <p className="text-[0.6rem] text-text-dim uppercase font-bold">Last Seen</p>
                     <p className="text-[0.7rem] font-bold text-success">
                        {new Date(myGpu.lastSeen).toLocaleTimeString()}
@@ -537,8 +560,8 @@ const Host = () => {
             </div>
           ) : (
             <div className="p-10 flex-1 flex flex-col items-center justify-center gap-6 text-center">
-              <div className="w-24 h-24 rounded-full border-4 border-primary/20 border-t-primary animate-[spin_3s_linear_infinite] flex items-center justify-center">
-                  <Zap size={40} className="text-primary" />
+              <div className="flex h-28 w-28 items-center justify-center rounded-full border-4 border-accent/30 border-t-primary bg-gradient-to-br from-primary/25 via-accent/20 to-secondary/20 shadow-[0_0_0_10px_rgba(239,180,168,0.08)] animate-[spin_3s_linear_infinite]">
+                  <Zap size={40} className="text-accent" />
               </div>
               <div>
                   <p className="text-lg font-bold">No GPU Detected yet</p>

@@ -16,7 +16,7 @@ const Migration = () => {
   });
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="page-migration flex flex-col gap-6">
       {/* Hero section */}
       <Motion.header
         initial={{ opacity: 0, y: 15 }}

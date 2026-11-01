@@ -78,7 +78,7 @@ const Dashboard = () => {
   }, []);
 
   return (
-    <div className="flex flex-col gap-6">
+    <div className="page-dashboard flex flex-col gap-6">
       <Motion.div
         initial={{ opacity: 0, y: 12 }}
         animate={{ opacity: 1, y: 0 }}
