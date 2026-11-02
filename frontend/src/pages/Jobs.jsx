@@ -171,11 +171,21 @@ ${(analysis.fixes || []).map((f) => `- ${f}`).join('\n')}`;
   );
 };
 
-const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
+const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer, onDownloadResults, downloadingResults }) => {
   const [logs, setLogs] = useState([]);
   const [status, setStatus] = useState(job?.status || 'loading');
+  const [jobDetails, setJobDetails] = useState(job);
 
   useEffect(() => {
+    api.get(`/jobs/${jobId}`)
+      .then(({ data }) => {
+        setJobDetails(data);
+        setStatus(data.status);
+      })
+      .catch((error) => {
+        console.error('Failed to load job result details:', error);
+      });
+
     const backendBase = import.meta.env.VITE_API_URL?.replace(/\/api$/, '') || 'http://localhost:5000';
     // EventSource cannot set headers, so the stream takes the JWT as a query param.
     const streamToken = localStorage.getItem('token') || '';
@@ -191,6 +201,9 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
         }
         if (data.done) {
           setStatus(data.status);
+          api.get(`/jobs/${jobId}`)
+            .then((response) => setJobDetails(response.data))
+            .catch((error) => console.error('Failed to refresh completed job details:', error));
           eventSource.close();
         }
       } catch (err) {
@@ -220,7 +233,7 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
             <span className="w-3 h-3 rounded-full bg-[#ffbd2e]" />
             <span className="w-3 h-3 rounded-full bg-[#27c93f]" />
           </div>
-          <span className="text-xs font-semibold text-text-dim font-mono">Job: {jobId}</span>
+          <span className="text-xs font-semibold text-text-dim font-mono">Results & logs · {jobId.substring(0, 12)}</span>
           <span className={`px-2 py-0.5 rounded text-[0.65rem] font-extrabold uppercase ${
             status === 'running' ? 'bg-success/10 text-success animate-pulse' :
             status === 'completed' ? 'bg-primary/10 text-primary' : 'bg-error/10 text-error'
@@ -230,6 +243,16 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
         </div>
 
         <div className="flex items-center gap-2">
+          {jobDetails?.outputReady && (
+            <button
+              onClick={() => onDownloadResults(jobDetails)}
+              disabled={downloadingResults}
+              className="flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-bold text-primary hover:bg-primary/20 disabled:opacity-50"
+            >
+              {downloadingResults ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+              Download model outputs
+            </button>
+          )}
           {/* AI Explainer button when failed */}
           {status === 'failed' && (
             <button
@@ -246,6 +269,16 @@ const LogTerminal = ({ jobId, job, onClose, onOpenAiExplainer }) => {
         </div>
       </div>
 
+      <div className="border-b border-ink/10 bg-white/[0.02] px-5 py-3">
+        <div className="grid gap-2 text-xs sm:grid-cols-3">
+          <div><span className="text-text-dim">Workload</span><p className="mt-1 truncate text-white">{jobDetails?.scriptName || jobDetails?.command || 'GPU job'}</p></div>
+          <div><span className="text-text-dim">GPU</span><p className="mt-1 truncate text-white">{jobDetails?.gpu?.model || 'Not assigned'}</p></div>
+          <div><span className="text-text-dim">Artifacts</span><p className="mt-1 text-white">{jobDetails?.outputReady ? 'Output archive is ready' : 'No output archive saved'}</p></div>
+        </div>
+        <p className="mt-2 text-[0.68rem] text-text-dim">
+          Training metrics and printed results appear in the run log. Files are downloadable when your script writes them to <code className="text-primary">/workspace/output</code>.
+        </p>
+      </div>
       <div className="p-4 flex-1 overflow-y-auto font-mono text-[0.82rem] leading-relaxed text-text-dim bg-surface-muted">
         {logs.length === 0 && <div className="text-text-dim animate-pulse">Connecting to live container output stream...</div>}
         {logs.map((log, i) => (
@@ -270,6 +303,7 @@ const Jobs = () => {
   const [migrationModalJob, setMigrationModalJob] = useState(null);
   const [explainingJobId, setExplainingJobId] = useState(null);
   const [downloadingJobId, setDownloadingJobId] = useState(null);
+  const [retryingJobId, setRetryingJobId] = useState(null);
 
   // Re-launch with AI fix state
   const [relaunchModalGpu, setRelaunchModalGpu] = useState(null);
@@ -284,6 +318,37 @@ const Jobs = () => {
       console.error('Failed to fetch jobs:', err);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const downloadJobResults = async (job) => {
+    try {
+      setDownloadingJobId(job._id);
+      const { data } = await api.get(`/jobs/${job._id}/result`);
+      const link = document.createElement('a');
+      link.href = data.downloadUrl;
+      link.download = `${job._id}-output.zip`;
+      link.rel = 'noopener';
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not download job output.');
+    } finally {
+      setDownloadingJobId(null);
+    }
+  };
+
+  const retryJob = async (job) => {
+    try {
+      setRetryingJobId(job._id);
+      const { data } = await api.post(`/jobs/${job._id}/retry`);
+      await fetchJobs(false);
+      alert(`A new run was queued (${data.job._id.substring(0, 8)}).`);
+    } catch (err) {
+      alert(err.response?.data?.message || 'Could not queue another run.');
+    } finally {
+      setRetryingJobId(null);
     }
   };
 
@@ -456,40 +521,37 @@ const Jobs = () => {
                     <div className="flex items-center gap-2">
                       {job.status === 'completed' && job.outputReady && (
                         <button
-                          onClick={async () => {
-                            try {
-                              setDownloadingJobId(job._id);
-                              const { data } = await api.get(`/jobs/${job._id}/result`);
-                              const link = document.createElement('a');
-                              link.href = data.downloadUrl;
-                              link.download = `${job._id}-output.zip`;
-                              link.rel = 'noopener';
-                              document.body.appendChild(link);
-                              link.click();
-                              link.remove();
-                            } catch (err) {
-                              alert(err.response?.data?.message || 'Could not download job output.');
-                            } finally {
-                              setDownloadingJobId(null);
-                            }
-                          }}
+                          onClick={() => downloadJobResults(job)}
                           disabled={downloadingJobId === job._id}
-                          title="Download job output"
+                          title="Download model outputs"
                           className="h-8 px-2.5 rounded-lg bg-primary/10 border border-primary/30 text-primary flex items-center gap-1.5 hover:bg-primary/20 transition-all text-xs disabled:opacity-50"
                         >
                           {downloadingJobId === job._id
                             ? <Loader2 size={14} className="animate-spin" />
                             : <Download size={14} />}
-                          Download
+                          Results ZIP
+                        </button>
+                      )}
+                      {(job.status === 'completed' || job.status === 'failed') && (
+                        <button
+                          onClick={() => retryJob(job)}
+                          disabled={retryingJobId === job._id}
+                          title="Queue a new run with the same script, dataset, and settings"
+                          className="h-8 px-2.5 rounded-lg bg-success/10 border border-success/30 text-success flex items-center gap-1.5 hover:bg-success/20 transition-all text-xs disabled:opacity-50"
+                        >
+                          {retryingJobId === job._id
+                            ? <Loader2 size={14} className="animate-spin" />
+                            : <RefreshCw size={14} />}
+                          Run again
                         </button>
                       )}
                       <button
                         onClick={() => setSelectedJob(job)}
-                        title="View Live Logs"
+                        title="View results and execution logs"
                         className="h-8 px-2.5 rounded-lg bg-surface-hover border border-ink/15 text-text-dim flex items-center gap-1.5 hover:bg-white/10 hover:text-white transition-all text-xs"
                       >
                         <TerminalIcon size={14} />
-                        Logs
+                        Results & logs
                       </button>
 
                       <button
@@ -558,6 +620,8 @@ const Jobs = () => {
               job={selectedJob}
               onClose={() => setSelectedJob(null)}
               onOpenAiExplainer={(id) => setExplainingJobId(id)}
+              onDownloadResults={downloadJobResults}
+              downloadingResults={downloadingJobId === selectedJob._id}
             />
           </>
         )}

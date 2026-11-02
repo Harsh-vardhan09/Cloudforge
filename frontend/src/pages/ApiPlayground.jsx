@@ -1,11 +1,16 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
 import { Send, Bot, User, Loader2, Sparkles, Trash2, Cpu, MessageSquare, ShieldCheck, Zap } from 'lucide-react';
 import api from '../services/api';
-import { useAuth } from '../context/AuthContext';
+
+const BUILT_IN_GEMINI = {
+    _id: 'builtin-gemini',
+    name: 'Gemini Flash Lite',
+    provider: 'gemini',
+    builtIn: true,
+};
 
 const ApiPlayground = () => {
-    const { token } = useAuth();
     const [rentedModels, setRentedModels] = useState([]);
     const [selectedModel, setSelectedModel] = useState(null);
     const [messages, setMessages] = useState([]);
@@ -20,8 +25,8 @@ const ApiPlayground = () => {
                 setFetchingModels(true);
                 const resp = await api.get('/resource/rented');
                 setRentedModels(resp.data);
-                if (resp.data.length > 0) setSelectedModel(resp.data[0]);
-            } catch (err) {
+                setSelectedModel(resp.data[0] || BUILT_IN_GEMINI);
+            } catch {
                 console.error("Failed to fetch rented models");
             } finally {
                 setFetchingModels(false);
@@ -46,17 +51,30 @@ const ApiPlayground = () => {
         setLoading(true);
 
         try {
-            const resp = await api.post(`/resource/proxy/${selectedModel._id}`, {
-                messages: [...messages, userMsg].map(m => ({ role: m.role, content: m.content }))
-            });
+            const requestMessages = [...messages, userMsg].map(m => ({ role: m.role, content: m.content }));
+            const endpoint = selectedModel.builtIn
+                ? '/ai/chat'
+                : `/resource/proxy/${selectedModel._id}`;
+            const resp = await api.post(endpoint, { messages: requestMessages });
+            const geminiContent = resp.data.candidates?.[0]?.content?.parts
+                ?.map(part => part.text || '')
+                .join('');
 
-            const assistantMsg = { 
+            const assistantMsg = {
                 role: 'assistant', 
-                content: selectedModel.provider === 'anthropic' ? resp.data.content[0].text : resp.data.choices[0].message.content 
+                content: (selectedModel.builtIn
+                    ? resp.data.content
+                    : selectedModel.provider === 'anthropic'
+                        ? resp.data.content?.[0]?.text
+                        : selectedModel.provider === 'google'
+                            ? geminiContent
+                            : resp.data.choices?.[0]?.message?.content
+                ) || 'The model returned an empty response.'
             };
             setMessages(prev => [...prev, assistantMsg]);
         } catch (err) {
-            setMessages(prev => [...prev, { role: 'assistant', content: "Error: Failed to process request through the proxy.", isError: true }]);
+            const message = err.response?.data?.message || "Failed to process the request. Check the API key and try again.";
+            setMessages(prev => [...prev, { role: 'assistant', content: `Error: ${message}`, isError: true }]);
         } finally {
             setLoading(false);
         }
@@ -82,13 +100,18 @@ const ApiPlayground = () => {
                         <select 
                             className="bg-surface-muted border border-ink/15 rounded-xl p-2 px-4 text-xs font-bold outline-none focus:border-primary transition-all"
                             value={selectedModel?._id || ''}
-                            onChange={(e) => setSelectedModel(rentedModels.find(m => m._id === e.target.value))}
+                            onChange={(e) => setSelectedModel(
+                                e.target.value === BUILT_IN_GEMINI._id
+                                    ? BUILT_IN_GEMINI
+                                    : rentedModels.find(m => m._id === e.target.value)
+                            )}
                         >
                             {rentedModels.length > 0 ? rentedModels.map(m => (
                                 <option key={m._id} value={m._id}>{m.name} ({m.provider})</option>
                             )) : (
-                                <option value="">No active rentals</option>
+                                null
                             )}
+                            <option value={BUILT_IN_GEMINI._id}>ComputeGrid · {BUILT_IN_GEMINI.name}</option>
                         </select>
                     )}
                     <button 
@@ -116,14 +139,18 @@ const ApiPlayground = () => {
                             <Bot size={64} className="text-primary" />
                             <div>
                                 <h3 className="text-xl font-bold">Start a conversation</h3>
-                                <p className="text-sm max-w-xs mx-auto">This playground uses your rented keys securely. Credits are deducted based on usage.</p>
+                                <p className="text-sm max-w-xs mx-auto">
+                                    {selectedModel?.builtIn
+                                        ? 'Powered by the server-configured Gemini API key. Rented keys are not required.'
+                                        : 'This playground uses your rented keys securely. Credits are deducted based on usage.'}
+                                </p>
                             </div>
                         </div>
                     )}
 
                     <AnimatePresence initial={false}>
                         {messages.map((msg, i) => (
-                            <motion.div 
+                            <Motion.div
                                 key={i}
                                 initial={{ opacity: 0, y: 10, scale: 0.95 }}
                                 animate={{ opacity: 1, y: 0, scale: 1 }}
@@ -139,7 +166,7 @@ const ApiPlayground = () => {
                                 } ${msg.isError ? 'border-error/50 text-error bg-error/5' : ''}`}>
                                     {msg.content}
                                 </div>
-                            </motion.div>
+                            </Motion.div>
                         ))}
                     </AnimatePresence>
 
@@ -180,14 +207,16 @@ const ApiPlayground = () => {
                         <div className="flex gap-4">
                             <div className="flex items-center gap-1.5 text-[0.6rem] text-text-dim font-bold uppercase tracking-widest">
                                 <ShieldCheck size={12} className="text-success" />
-                                Proxy Verified
+                                {selectedModel?.builtIn ? 'Server-side Gemini' : 'Proxy Verified'}
                             </div>
-                            <div className="flex items-center gap-1.5 text-[0.6rem] text-text-dim font-bold uppercase tracking-widest">
-                                <Zap size={12} className="text-accent" />
-                                Instant Billing
-                            </div>
+                            {!selectedModel?.builtIn && (
+                                <div className="flex items-center gap-1.5 text-[0.6rem] text-text-dim font-bold uppercase tracking-widest">
+                                    <Zap size={12} className="text-accent" />
+                                    Instant Billing
+                                </div>
+                            )}
                         </div>
-                        {selectedModel && (
+                        {selectedModel && !selectedModel.builtIn && (
                             <p className="text-[0.65rem] text-primary/60 font-extrabold italic">
                                 Rates: ${selectedModel.hourlyRate}/hr + ${selectedModel.tokenRate}/1M tokens
                             </p>

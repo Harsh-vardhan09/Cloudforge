@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { io } from 'socket.io-client';
 import {
   Terminal, Shield, Cpu, Zap, Download, Copy, Check, DollarSign,
   RotateCcw, ArrowRight, Loader2, AlertTriangle, CheckCircle2, XCircle, HardDrive, Network
@@ -7,6 +8,7 @@ import {
 import { useAuth } from '../context/AuthContext';
 import api from '../services/api';
 import { useNavigate } from 'react-router-dom';
+import TelemetryPanel from '../components/TelemetryPanel';
 
 const ReclaimModal = ({ job, gpu, onClose, onSuccess }) => {
   const navigate = useNavigate();
@@ -213,6 +215,7 @@ const Host = () => {
   const [editingVram, setEditingVram] = useState(false);
   const [newPrice, setNewPrice] = useState('0.5');
   const [newVram, setNewVram] = useState('0');
+  const [telemetrySocket, setTelemetrySocket] = useState(null);
 
   // Reclaim Modal state
   const [showReclaimModal, setShowReclaimModal] = useState(false);
@@ -253,6 +256,25 @@ const Host = () => {
       const interval = setInterval(fetchMyGpu, 10000); // refresh every 10s
       return () => clearInterval(interval);
     }
+  }, [token]);
+
+  useEffect(() => {
+    if (!token) {
+      setTelemetrySocket(null);
+      return undefined;
+    }
+
+    const backendUrl = new URL(
+      api.defaults.baseURL || 'http://localhost:5000/api',
+      window.location.origin
+    ).origin;
+    const socket = io(backendUrl, { auth: { token } });
+    setTelemetrySocket(socket);
+
+    return () => {
+      socket.disconnect();
+      setTelemetrySocket(null);
+    };
   }, [token]);
 
   const runCommand = `python main.py --token ${token || 'YOUR_TOKEN_HERE'}`;
@@ -509,6 +531,11 @@ const Host = () => {
                     </p>
                  </div>
               </div>
+
+              <TelemetryPanel
+                socket={telemetrySocket}
+                initialSnapshot={myGpu.metrics?.updatedAt ? myGpu.metrics : null}
+              />
 
               {/* Module 8: Active Job & Reclaim Card */}
               {activeJob && (

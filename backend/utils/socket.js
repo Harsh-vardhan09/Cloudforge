@@ -79,6 +79,13 @@ export const emitGpuStatus = (gpuId, status) => {
   _io?.emit("gpu:status", { gpuId, status });
 };
 
+/** Send hardware telemetry and safety alerts only to the authenticated GPU owner. */
+export const emitGpuTelemetry = (userId, snapshot, safetyAlert) => {
+  const ownerRoom = `user:${userId}`;
+  _io?.to(ownerRoom).emit("gpu:telemetry", snapshot);
+  if (safetyAlert) _io?.to(ownerRoom).emit("gpu:safety_alert", safetyAlert);
+};
+
 export const emitUserNotification = (userId, notification) => {
   _io?.to(`user:${userId}`).emit("notification:new", notification);
 };
@@ -98,4 +105,3 @@ export const emitJobMigration = (jobId, migrationData) => {
     _io?.to(`job:${jobId}`).emit("job:migration", { jobId, ...migrationData, timestamp: new Date() });
   }
 };
-

@@ -64,7 +64,7 @@ const JobLaunchModal = ({ gpu = null, showcaseGpu = null, onClose, onSuccess, in
       setCommand(file.name.toLowerCase().endsWith('.sh')
         ? `bash ${path}`
         : file.name.toLowerCase().endsWith('.ipynb')
-          ? `jupyter nbconvert --to notebook --execute ${path} --output /workspace/output_${file.name}`
+          ? `mkdir -p /workspace/output && jupyter nbconvert --to notebook --execute ${path} --output-dir /workspace/output`
           : `python ${path}`);
     };
     reader.onerror = () => setError('Could not read the selected script file.');

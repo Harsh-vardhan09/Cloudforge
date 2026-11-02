@@ -16,6 +16,7 @@ import time
 import zipfile
 from typing import Optional
 
+from config import settings
 from gpu_info import get_gpu_info
 
 logger = logging.getLogger(__name__)
@@ -330,16 +331,25 @@ def run_docker_job(
             _restore_checkpoint(checkpoint_download_url, checkpoint_dir)
             report_log(f"[agent] 📥 Restored checkpoint snapshot {checkpoint_sequence}")
 
-        report_log(f"[agent] 📦 Pulling image: {docker_image}")
+        image_is_cached = False
+        if settings.docker_image_pull_policy == "if-not-present":
+            try:
+                client.images.get(docker_image)
+                image_is_cached = True
+            except docker.errors.ImageNotFound:
+                pass
 
-        # Pull image (may take a while for large images)
-        try:
-            client.images.pull(docker_image)
-            report_log(f"[agent] ✅ Image pulled: {docker_image}")
-        except docker.errors.APIError as e:
-            report_log(f"[agent] ❌ Failed to pull image: {e}")
-            report_complete("failed")
-            return
+        if image_is_cached:
+            report_log(f"[agent] ♻️ Using cached image: {docker_image}")
+        else:
+            report_log(f"[agent] 📦 Pulling image: {docker_image}")
+            try:
+                client.images.pull(docker_image)
+                report_log(f"[agent] ✅ Image pulled: {docker_image}")
+            except docker.errors.APIError as error:
+                report_log(f"[agent] ❌ Failed to pull image: {error}")
+                report_complete("failed")
+                return
 
         if job_id not in active_jobs:
             return
@@ -355,6 +365,11 @@ def run_docker_job(
             ]
         else:
             report_log("[agent] ℹ️  No NVIDIA GPU detected — running on CPU")
+
+        report_log(
+            f"[agent] Container limits: {settings.job_cpu_cores:g} CPU cores, "
+            f"{settings.job_memory_limit} system RAM"
+        )
 
         # Prepare environment variables
         container_env = {k: str(v) for k, v in env.items()}
@@ -376,9 +391,9 @@ def run_docker_job(
             environment=container_env,
             volumes={job_dir: {"bind": "/workspace", "mode": "rw"}},
             working_dir="/workspace",
-            mem_limit="4g",           # Lowered for compatibility
-            memswap_limit="4g",       # Lowered for compatibility
-            nano_cpus=4_000_000_000,  # 4 CPU cores
+            mem_limit=settings.job_memory_limit,
+            memswap_limit=settings.job_memory_limit,
+            nano_cpus=int(settings.job_cpu_cores * 1_000_000_000),
             shm_size="1g",
             network_mode="bridge",
             labels={"gpushare.job_id": job_id},

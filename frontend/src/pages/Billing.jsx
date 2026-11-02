@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion as Motion } from 'framer-motion';
-import { Wallet, PieChart, History, ArrowUpRight, ArrowDownLeft, Loader2, CircleDollarSign, ArrowDownToLine } from 'lucide-react';
+import { Wallet, PieChart, History, ArrowUpRight, ArrowDownLeft, Loader2, CircleDollarSign, ArrowDownToLine, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
@@ -10,6 +10,7 @@ const Billing = () => {
   const [loading, setLoading] = useState(true);
   const [addingFunds, setAddingFunds] = useState(false);
   const [customAmount, setCustomAmount] = useState('');
+  const [paymentError, setPaymentError] = useState('');
 
   const fetchBillingData = async () => {
     try {
@@ -28,32 +29,43 @@ const Billing = () => {
   }, []);
 
   const initiatePayment = async (amountInINR) => {
-    if (!amountInINR || isNaN(amountInINR) || amountInINR <= 0) return;
+    const amount = Number(amountInINR);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      setPaymentError('Enter an amount greater than ₹0.');
+      return;
+    }
 
     try {
       setAddingFunds(true);
-      // 1. Create order on backend
-      const { data: order } = await api.post('/billing/order', { amount: parseFloat(amountInINR) });
+      setPaymentError('');
+      const { data: order } = await api.post('/billing/order', { amount });
 
-      // 2. Open Razorpay Checkout
+      if (order.mode === 'demo') {
+        await api.post('/billing/verify', { demoOrderId: order.id });
+        await Promise.all([fetchBillingData(), fetchUser()]);
+        return;
+      }
+
+      if (typeof window.Razorpay !== 'function') {
+        throw new Error('Razorpay Checkout could not be loaded. Check your internet connection and reload the page.');
+      }
+
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+        key: order.keyId,
         amount: order.amount,
         currency: order.currency,
-        name: "HelloSharing",
+        name: "ComputeGrid",
         description: `Add ${order.creditsToReceive} Credits to wallet`,
         order_id: order.id,
         handler: async (response) => {
-          // 3. Verify payment on backend
           try {
-            // The server credits the amount recorded when the order was created,
-            // so only the Razorpay handshake fields are sent here.
             await api.post('/billing/verify', { ...response });
-            alert("Payment successful! Credits added.");
-            fetchBillingData();
-            fetchUser(); // Refresh user context balance
-          } catch {
-            alert("Payment verification failed. Please contact support.");
+            await Promise.all([fetchBillingData(), fetchUser()]);
+          } catch (error) {
+            setPaymentError(
+              error.response?.data?.message ||
+              'Payment was received, but verification failed. Contact support with your payment ID.'
+            );
           }
         },
         prefill: {
@@ -66,10 +78,17 @@ const Billing = () => {
       };
 
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (event) => {
+        setPaymentError(
+          event.error?.description ||
+          'Razorpay could not complete the payment. Check the payment method and try again.'
+        );
+      });
       rzp.open();
     } catch (err) {
-      console.error("Razorpay error:", err);
-      alert("Failed to initiate payment.");
+      const message = err.response?.data?.message || err.message;
+      console.error("Payment order creation failed:", message);
+      setPaymentError(message || 'Could not start the payment. Please try again.');
     } finally {
       setAddingFunds(false);
     }
@@ -112,7 +131,20 @@ const Billing = () => {
             </h2>
             
             <div className="mt-7 flex flex-col gap-3">
-              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">Buy Credits (1 INR = 1 CR)</span>
+              {data.paymentMode === 'demo' && (
+                <div role="status" className="rounded-xl border border-accent/30 bg-accent/10 p-3 text-xs leading-relaxed text-accent">
+                  Demo mode: credits are simulated. No real money is charged.
+                </div>
+              )}
+              <span className="text-xs font-semibold text-text-dim uppercase tracking-wider">
+                {data.paymentMode === 'demo' ? 'Add demo credits (1 demo credit unit = 1 CR)' : 'Buy Credits (1 INR = 1 CR)'}
+              </span>
+              {paymentError && (
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-error/30 bg-error/10 p-3 text-xs leading-relaxed text-error">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+                  <span>{paymentError}</span>
+                </div>
+              )}
               <div className="flex flex-wrap items-center gap-2">
                 {[500, 1000, 5000].map(amt => (
                   <button
@@ -121,20 +153,20 @@ const Billing = () => {
                     disabled={addingFunds}
                     className="flex-1 rounded-lg border border-white/10 bg-white/5 py-2 px-3 text-sm font-medium hover:bg-white/10 hover:border-primary/50 transition-colors"
                   >
-                    ₹{amt}
+                    {data.paymentMode === 'demo' ? `${amt} CR` : `₹${amt}`}
                   </button>
                 ))}
               </div>
               <form onSubmit={handleCustomAmountSubmit} className="flex items-center gap-2 mt-1">
                 <div className="relative flex-1">
-                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim text-sm">₹</span>
+                  {data.paymentMode !== 'demo' && <span className="absolute left-3 top-1/2 -translate-y-1/2 text-text-dim text-sm">₹</span>}
                   <input 
                     type="number"
                     min="1"
-                    placeholder="Custom Amount"
+                    placeholder={data.paymentMode === 'demo' ? 'Demo credits' : 'Custom Amount'}
                     value={customAmount}
                     onChange={(e) => setCustomAmount(e.target.value)}
-                    className="w-full rounded-lg border border-ink/15 bg-white/5 py-2 pl-7 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-white"
+                    className={`w-full rounded-lg border border-ink/15 bg-white/5 py-2 pr-3 text-sm focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary text-white ${data.paymentMode === 'demo' ? 'pl-3' : 'pl-7'}`}
                   />
                 </div>
                 <button
@@ -198,7 +230,9 @@ const Billing = () => {
                   {tx.type === 'deposit' ? <ArrowDownLeft size={18} /> : <ArrowUpRight size={18} />}
                 </div>
                 <div className="flex min-w-0 flex-1 flex-col">
-                  <span className="truncate text-sm font-medium capitalize text-white">{tx.type} {tx.razorpayPaymentId ? `· ${tx.razorpayPaymentId.substring(0,8)}` : ''}</span>
+                  <span className="truncate text-sm font-medium capitalize text-white">
+                    {tx.type}{tx.paymentProvider === 'demo' ? ' · Demo' : tx.razorpayPaymentId ? ` · ${tx.razorpayPaymentId.substring(0,8)}` : ''}
+                  </span>
                   <span className="mt-0.5 text-[0.68rem] text-text-dim">{new Date(tx.createdAt).toLocaleString()}</span>
                 </div>
                 <span className={`ml-auto font-mono text-sm font-semibold ${tx.type === 'deposit' ? 'text-success' : 'text-error'}`}>

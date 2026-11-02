@@ -5,12 +5,10 @@ a heartbeat every N seconds to stay "online" in the registry.
 """
 import time
 import logging
-import os
 import socket
 import threading
 import requests
 from typing import Optional
-from gpu_info import get_gpu_info, get_gpu_metrics
 
 from config import settings
 from gpu_info import get_gpu_info, get_gpu_metrics

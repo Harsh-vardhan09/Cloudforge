@@ -71,6 +71,19 @@ backend runs (`http://localhost:5000` for a local stack).
 `PRICE_PER_HOUR` is what you charge renters. You can also change it later from
 the Add GPU page without restarting.
 
+The Windows installer detects installed system RAM and offers per-job RAM caps
+that keep about 40% available for Windows, Docker, the agent, and other apps. It
+also limits concurrent jobs based on that budget. If you configure the agent
+manually, `JOB_MEMORY_LIMIT` defaults to 1 GB per container; increase it only
+when the host has spare RAM, and ensure the limit multiplied by
+`MAX_CONCURRENT_JOBS` leaves enough memory for the host. Docker enforces this
+system-RAM cap for each job container; it does not reserve or cap GPU VRAM.
+Increase `JOB_CPU_CORES` too when CPU-heavy preprocessing or data loading needs
+more capacity. The default
+`DOCKER_IMAGE_PULL_POLICY=if-not-present` reuses a locally cached image to reduce
+cold-start time; use `always` to refresh the image from its registry for each
+job.
+
 > Tokens expire after 7 days. When that happens the agent logs a `401` and stops
 > taking jobs — copy a fresh token into `.env` and restart.
 
@@ -90,7 +103,7 @@ A healthy start looks like this:
 
 ```
 GPU Host Agent starting...
-Heartbeat thread started (interval: 30s)
+Heartbeat thread started (interval: 15s)
 Job claim and lease scheduler started
 Uvicorn running on http://0.0.0.0:7000
 Detected GPU: NVIDIA GeForce RTX 3050 6GB Laptop GPU (6.0 GB VRAM)
@@ -99,6 +112,15 @@ GPU registered with backend
 
 Your GPU now appears on the **Take GPU** marketplace and the agent begins polling
 for jobs. Leave it running; stop it with Ctrl+C.
+
+While the agent is online, it sends GPU and system-health snapshots every 15
+seconds. The Host page shows GPU temperature, utilization, VRAM, power and fan
+speed, plus CPU and RAM usage, uptime, disk use, and network totals. GPU readings
+require NVIDIA drivers and `nvidia-smi`; CPU temperature is shown when the
+operating system exposes a sensor. Safety alerts notify the host but do not
+automatically stop or throttle a running job.
+Alerts are raised at GPU 80°C (critical at 92°C), CPU 85°C (critical at 95°C),
+GPU power 350 W, or RAM usage 90%.
 
 If the default port `7000` is already in use, the agent automatically tries
 ports `7001` through `7100` and registers the selected port with the backend.

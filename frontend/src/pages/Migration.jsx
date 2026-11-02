@@ -1,20 +1,10 @@
-import React, { useState, useEffect } from 'react';
 import { motion as Motion } from 'framer-motion';
 import {
-  Network, Cpu, HardDrive, Server, ShieldCheck, Zap,
-  CheckCircle2, RotateCcw, ArrowRight, Play, Terminal, Info, Sparkles
+  Network, ShieldCheck, Zap, RotateCcw, Sparkles
 } from 'lucide-react';
 import JobMigrationGraph from '../components/JobMigrationGraph';
-import api from '../services/api';
 
 const Migration = () => {
-  const [stats, setStats] = useState({
-    totalMigrations: 142,
-    avgHydrationSec: '1.4s',
-    dataRetentionRate: '100%',
-    activeNodes: 18,
-  });
-
   return (
     <div className="page-migration flex flex-col gap-6">
       {/* Hero section */}
@@ -29,47 +19,44 @@ const Migration = () => {
         <div className="relative z-10 flex flex-col gap-3">
           <div className="flex items-center gap-2">
             <span className="eyebrow flex items-center gap-1.5 text-amber-400">
-              <Sparkles size={13} /> Module 8: Zero-Loss Workload Migration
-            </span>
-            <span className="text-[0.65rem] font-mono uppercase px-2 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-              Live Topology Mesh
+              <Sparkles size={13} /> GPU migration
             </span>
           </div>
 
           <h2 className="text-3xl font-semibold tracking-tight sm:text-4xl text-white">
-            Real-Time Job Migration Graph
+            Keep your job running when a GPU goes offline
           </h2>
           <p className="max-w-2xl text-sm leading-6 text-text-dim">
-            When a GPU host reclaims their hardware, the decentralized compute network gracefully evicts the container,
-            stores durable checkpoints into Object Storage, and resumes training on an available peer node with <strong className="text-white">zero wasted compute</strong>.
+            The network saves your job's progress, moves it to another available GPU, and continues from where it stopped.
+            Follow the steps below to see how it works.
           </p>
         </div>
 
         {/* Highlights metrics strip */}
         <div className="relative z-10 mt-6 grid grid-cols-2 sm:grid-cols-4 gap-3">
           <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
-            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Checkpoint Retention</span>
+            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Saved progress retained</span>
             <span className="text-xl font-bold text-success flex items-center gap-1">
               <ShieldCheck size={18} /> 100.0%
             </span>
           </div>
 
           <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
-            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Warm Hydration Latency</span>
+            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Average resume time</span>
             <span className="text-xl font-bold text-primary flex items-center gap-1">
               <Zap size={18} /> 1.4s Avg
             </span>
           </div>
 
           <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
-            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Host Reclaim Latency</span>
+            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">GPU release</span>
             <span className="text-xl font-bold text-amber-400 flex items-center gap-1">
               <RotateCcw size={18} /> Instant
             </span>
           </div>
 
           <div className="rounded-xl border border-ink/15 bg-surface-muted p-3.5 flex flex-col gap-1">
-            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Total Zero-Loss Resumes</span>
+            <span className="text-[0.62rem] font-mono uppercase tracking-wider text-text-dim">Successful resumes</span>
             <span className="text-xl font-bold text-white flex items-center gap-1">
               <Network size={18} /> 142 Completed
             </span>
@@ -86,7 +73,7 @@ const Migration = () => {
         <JobMigrationGraph autoStart={false} />
       </Motion.section>
 
-      {/* Mechanics Explanation for Judges & Users */}
+      {/* Plain-language explanation of the migration stages */}
       <Motion.section
         initial={{ opacity: 0, y: 15 }}
         animate={{ opacity: 1, y: 0 }}
@@ -99,12 +86,10 @@ const Migration = () => {
             1
           </div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            Graceful Eviction on Node A
+            Release the current GPU
           </h3>
           <p className="text-xs text-text-dim leading-relaxed">
-            The host can reclaim their GPU at any second for personal tasks (e.g. gaming or local AI inference).
-            The agent sends a graceful <code className="text-amber-300 font-mono">SIGTERM</code>, pausing the Docker container
-            and immediately releasing the host's VRAM.
+            If the host needs their GPU back, your job pauses safely and the GPU is released for the host to use.
           </p>
         </div>
 
@@ -114,11 +99,10 @@ const Migration = () => {
             2
           </div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            Durable S3 Checkpoint Sync
+            Save the job's progress
           </h3>
           <p className="text-xs text-text-dim leading-relaxed">
-            The latest saved tensors, optimizer weights, and epoch/step counters are secured into distributed S3 Object Storage.
-            SHA-256 integrity checks guarantee zero corrupted weights or lost training epochs.
+            A checkpoint is a saved snapshot of the job, including its current training step. It is stored safely so the job can continue later.
           </p>
         </div>
 
@@ -128,11 +112,10 @@ const Migration = () => {
             3
           </div>
           <h3 className="text-base font-bold text-white flex items-center gap-2">
-            Instant Resume on Node B
+            Continue on another GPU
           </h3>
           <p className="text-xs text-text-dim leading-relaxed">
-            The centralized scheduler matches the requeued job with an idle worker across the decentralized mesh.
-            Node B streams the checkpoint, hydrates VRAM, and resumes training from the exact same step with zero user intervention.
+            When another GPU is available, it loads the saved checkpoint and resumes the job from the same step.
           </p>
         </div>
       </Motion.section>

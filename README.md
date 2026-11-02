@@ -151,13 +151,18 @@ OBJECT_STORAGE_REGION=us-east-1
 OBJECT_STORAGE_ACCESS_KEY_ID=your-key
 OBJECT_STORAGE_SECRET_ACCESS_KEY=your-secret
 
-# Payment (Razorpay - optional for demo)
+# Payment
+# Development defaults to simulated demo payments (no real money charged).
+# Set PAYMENT_MODE=razorpay to test with Razorpay; demo payments are disabled in production.
+PAYMENT_MODE=demo
 RAZORPAY_KEY_ID=your_key_id
 RAZORPAY_KEY_SECRET=your_secret_key
 
 # Frontend Config
 VITE_API_URL=http://localhost:5000/api
 ```
+
+In development, the Billing page uses demo credits by default, and API rentals use the same simulated checkout. These transactions are marked as demo and never charge real money. Set `PAYMENT_MODE=razorpay` with valid Razorpay credentials to test the live provider flow.
 
 ---
 
@@ -244,4 +249,3 @@ ComputeGrid supports seamless workload resumption when a host needs their GPU ba
 ## 📄 License
 
 This project is licensed under the [ISC License](LICENSE).
-

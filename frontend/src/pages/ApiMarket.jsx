@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Globe, Key, Shield, DollarSign, ExternalLink, Loader2, Sparkles, Plus, X, CreditCard, Pencil, Trash2 } from 'lucide-react';
+import { motion as Motion, AnimatePresence } from 'framer-motion';
+import { Search, Globe, Key, Shield, DollarSign, ExternalLink, Loader2, Sparkles, Plus, X, CreditCard, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import api from '../services/api';
 import { useAuth } from '../context/AuthContext';
 
 const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
-  <motion.div
+  <Motion.div
     layout
     initial={{ opacity: 0, y: 20 }}
     animate={{ opacity: 1, y: 0 }}
@@ -74,7 +74,7 @@ const ApiCard = ({ resource, onRent, onEdit, onDelete }) => (
       Rent This Model
       <Key size={16} className="group-hover:rotate-12 transition-transform" />
     </button>
-  </motion.div>
+  </Motion.div>
 );
 
 const RentedApiCard = ({ resource }) => {
@@ -100,7 +100,7 @@ const RentedApiCard = ({ resource }) => {
   }, [resource.activeRental?.expiresAt]);
 
   return (
-    <motion.div
+    <Motion.div
       initial={{ opacity: 0, scale: 0.95 }}
       animate={{ opacity: 1, scale: 1 }}
       className="p-8 glass-card bg-gradient-to-br from-success/5 to-primary/5 border-success/30 flex flex-col gap-6"
@@ -154,7 +154,7 @@ const RentedApiCard = ({ resource }) => {
          **Security Note**: Your real API key is hidden. This proxy ensures your usage is tracked and paid for without exposing the host's primary credentials.
        </p>
     </div>
-  </motion.div>
+  </Motion.div>
   );
 };
 
@@ -168,6 +168,7 @@ const ApiMarket = () => {
   const [selectedForRent, setSelectedForRent] = useState(null);
   const [rentHours, setRentHours] = useState(1);
   const [paying, setPaying] = useState(false);
+  const [paymentError, setPaymentError] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({
     name: '', provider: 'openai', customProviderName: '', apiKey: '', hourlyRate: 0.1, tokenRate: 1.0, billingCycle: 'hourly'
@@ -203,7 +204,7 @@ const ApiMarket = () => {
       setShowRegister(false);
       setEditingId(null);
       fetchResources();
-    } catch (err) {
+    } catch {
       alert("Action failed");
     }
   };
@@ -225,9 +226,31 @@ const ApiMarket = () => {
     const amount = selectedForRent.hourlyRate * rentHours;
     try {
       setPaying(true);
+      setPaymentError('');
       const { data: order } = await api.post('/billing/order', { amount });
+
+      const finishRental = async (verificationData, isDemo = false) => {
+        await api.post('/billing/verify', verificationData);
+        await api.post('/resource/rent', { resourceId: selectedForRent._id, hours: rentHours });
+        if (isDemo) {
+          alert('Demo payment successful. Rental access is active; no real money was charged.');
+        } else {
+          alert('Payment successful! Access granted.');
+        }
+        setShowRentModal(false);
+        fetchResources();
+      };
+
+      if (order.mode === 'demo') {
+        await finishRental({ demoOrderId: order.id }, true);
+        return;
+      }
+
+      if (typeof window.Razorpay !== 'function') {
+        throw new Error('Razorpay Checkout could not be loaded. Check your internet connection and reload the page.');
+      }
       const options = {
-        key: import.meta.env.VITE_RAZORPAY_KEY_ID || 'rzp_test_placeholder',
+        key: order.keyId,
         amount: order.amount,
         currency: order.currency,
         name: "ComputeGrid",
@@ -235,22 +258,27 @@ const ApiMarket = () => {
         order_id: order.id,
         handler: async (response) => {
           try {
-            await api.post('/billing/verify', { ...response, amountUSD: amount });
-            await api.post('/resource/rent', { resourceId: selectedForRent._id, hours: rentHours });
-            alert("Payment successful! Access granted.");
-            setShowRentModal(false);
-            fetchResources();
+            await finishRental(response);
           } catch (err) {
-            alert("Payment verified but access activation failed.");
+            const message = err.response?.data?.message || 'Payment was verified, but rental access could not be activated. Contact support with your payment ID.';
+            setPaymentError(message);
           }
         },
         prefill: { name: user?.name, email: user?.email },
         theme: { color: "#3b82f6" },
       };
       const rzp = new window.Razorpay(options);
+      rzp.on('payment.failed', (event) => {
+        setPaymentError(
+          event.error?.description ||
+          'The payment could not be completed. Please try again.'
+        );
+      });
       rzp.open();
     } catch (err) {
-      alert("Direct payment failed to initiate.");
+      const message = err.response?.data?.message || err.message;
+      console.error("API rental payment failed:", message);
+      setPaymentError(message || 'Could not start the payment. Please try again.');
     } finally {
       setPaying(false);
     }
@@ -261,7 +289,7 @@ const ApiMarket = () => {
     try {
       await api.delete(`/resource/${id}`);
       fetchResources();
-    } catch (err) {
+    } catch {
       alert("Delete failed");
     }
   };
@@ -336,12 +364,12 @@ const ApiMarket = () => {
       <AnimatePresence>
         {showRentModal && selectedForRent && (
           <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-ink/30 backdrop-blur-md"
               onClick={() => setShowRentModal(false)}
             />
-            <motion.div
+            <Motion.div
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               className="glass-card w-full max-w-sm p-8 relative flex flex-col gap-6"
             >
@@ -376,6 +404,13 @@ const ApiMarket = () => {
                  <CreditCard className="text-text-dim opacity-20" size={32} />
               </div>
 
+              {paymentError && (
+                <div role="alert" className="flex items-start gap-2 rounded-xl border border-error/30 bg-error/10 p-3 text-xs leading-relaxed text-error">
+                  <AlertTriangle size={15} className="mt-0.5 shrink-0" />
+                  <span>{paymentError}</span>
+                </div>
+              )}
+
               <div className="flex flex-col gap-3">
                 <button
                   onClick={handlePayAndRent}
@@ -396,7 +431,7 @@ const ApiMarket = () => {
                   Use Account Balance
                 </button>
               </div>
-            </motion.div>
+            </Motion.div>
           </div>
         )}
       </AnimatePresence>
@@ -405,12 +440,12 @@ const ApiMarket = () => {
       <AnimatePresence>
         {showRegister && (
           <div className="fixed inset-0 z-[1001] flex items-center justify-center p-4">
-            <motion.div
+            <Motion.div
               initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
               className="absolute inset-0 bg-ink/30 backdrop-blur-md"
               onClick={() => { setShowRegister(false); setEditingId(null); }}
             />
-            <motion.form
+            <Motion.form
               initial={{ scale: 0.9, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.9, opacity: 0 }}
               onSubmit={handleRegister}
               className="glass-card w-full max-md p-8 relative flex flex-col gap-6"
@@ -488,7 +523,7 @@ const ApiMarket = () => {
                 <Shield size={18} />
                 {editingId ? 'Update Resource' : 'Securely List Resource'}
               </button>
-            </motion.form>
+            </Motion.form>
           </div>
         )}
       </AnimatePresence>

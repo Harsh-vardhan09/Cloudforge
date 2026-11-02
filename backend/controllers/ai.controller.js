@@ -3,6 +3,8 @@ import Job from "../models/job.model.js";
 import GPU from "../models/gpu.model.js";
 import { logger } from "../utils/logger.js";
 
+const GEMINI_MODEL = "gemini-flash-lite-latest";
+
 // Helper to call OpenAI or Gemini if key is present
 async function callLLMIfAvailable(systemPrompt, userPrompt) {
   const geminiKey = process.env.GEMINI_API_KEY;
@@ -10,7 +12,7 @@ async function callLLMIfAvailable(systemPrompt, userPrompt) {
 
   if (geminiKey) {
     try {
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent?key=${geminiKey}`;
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${geminiKey}`;
       const resp = await axios.post(
         url,
         {
@@ -65,6 +67,68 @@ async function callLLMIfAvailable(systemPrompt, userPrompt) {
 
   return null;
 }
+
+export const aiPlaygroundChat = async (req, res) => {
+  const geminiKey = process.env.GEMINI_API_KEY;
+  if (!geminiKey) {
+    return res.status(503).json({ message: "Gemini is not configured on the backend" });
+  }
+
+  const { messages } = req.body || {};
+  if (
+    !Array.isArray(messages) ||
+    messages.length === 0 ||
+    messages.length > 40 ||
+    messages.some(
+      (message) =>
+        !message ||
+        !["user", "assistant"].includes(message.role) ||
+        typeof message.content !== "string" ||
+        !message.content.trim() ||
+        message.content.length > 12000
+    ) ||
+    messages.reduce((total, message) => total + message.content.length, 0) > 40000
+  ) {
+    return res.status(400).json({ message: "Provide up to 40 valid chat messages (40,000 characters total)" });
+  }
+
+  try {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+    const response = await axios.post(
+      url,
+      {
+        contents: messages.map(({ role, content }) => ({
+          role: role === "assistant" ? "model" : "user",
+          parts: [{ text: content }],
+        })),
+        generationConfig: {
+          temperature: 0.7,
+          maxOutputTokens: 2048,
+        },
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          "x-goog-api-key": geminiKey,
+        },
+        timeout: 60000,
+      }
+    );
+    const content = response.data.candidates?.[0]?.content?.parts
+      ?.map((part) => part.text || "")
+      .join("");
+    if (!content) {
+      return res.status(502).json({ message: "Gemini returned no text. Try rephrasing your message." });
+    }
+
+    return res.json({ content, model: GEMINI_MODEL });
+  } catch (error) {
+    const status = error.response?.status || 502;
+    const message = error.response?.data?.error?.message || "Gemini could not process this request";
+    logger.error(`Gemini Playground request failed (${status}): ${message}`);
+    return res.status(status >= 400 && status < 500 ? status : 502).json({ message });
+  }
+};
 
 // Built-in Intelligent Job Assistant Engine
 function generateJobAssistantLocal({

@@ -4,10 +4,67 @@ import {
   isAllowedAgentPort,
   normalizeIp,
 } from "../utils/network.js";
+import { emitGpuTelemetry } from "../utils/socket.js";
 
 // The marketplace listings are unauthenticated, so they expose only what the
 // storefront renders. Notably excludes ipAddress, agentPort and the host's email.
 const PUBLIC_GPU_FIELDS = "model vram status pricePerHour host";
+const METRIC_RANGES = {
+  gpu_util: [0, 100],
+  mem_util: [0, 100],
+  mem_used_mb: [0, Number.MAX_SAFE_INTEGER],
+  mem_total_mb: [0, Number.MAX_SAFE_INTEGER],
+  temperature: [0, 150],
+  gpu_temp: [0, 150],
+  gpu_mem_used_mb: [0, Number.MAX_SAFE_INTEGER],
+  gpu_mem_total_mb: [0, Number.MAX_SAFE_INTEGER],
+  power_watts: [0, 5000],
+  gpu_power_w: [0, 5000],
+  gpu_fan_pct: [0, 100],
+  cpu_pct: [0, 100],
+  cpu_temp: [0, 150],
+  ram_pct: [0, 100],
+  ram_used_mb: [0, Number.MAX_SAFE_INTEGER],
+  ram_total_mb: [0, Number.MAX_SAFE_INTEGER],
+  uptime_seconds: [0, Number.MAX_SAFE_INTEGER],
+  disk_used_pct: [0, 100],
+  disk_used_gb: [0, Number.MAX_SAFE_INTEGER],
+  disk_total_gb: [0, Number.MAX_SAFE_INTEGER],
+  net_sent_mb: [0, Number.MAX_SAFE_INTEGER],
+  net_recv_mb: [0, Number.MAX_SAFE_INTEGER],
+};
+const previousSafetyByGpu = new Map();
+
+const normalizeMetrics = (metrics) =>
+  Object.fromEntries(
+    Object.entries(METRIC_RANGES).flatMap(([key, [min, max]]) => {
+      const value = metrics[key];
+      return typeof value === "number" && Number.isFinite(value) && value >= min && value <= max
+        ? [[key, value]]
+        : [];
+    })
+  );
+
+const assessSafety = (metrics) => {
+  const alerts = [];
+  let level = "ok";
+  const warn = (message, critical = false) => {
+    alerts.push(message);
+    if (critical) level = "critical";
+    else if (level === "ok") level = "warning";
+  };
+
+  const gpuTemp = metrics.gpu_temp ?? metrics.temperature;
+  if (gpuTemp >= 92) warn(`GPU temperature is critical (${gpuTemp}°C).`, true);
+  else if (gpuTemp >= 80) warn(`GPU temperature is high (${gpuTemp}°C).`);
+  if (metrics.cpu_temp >= 95) warn(`CPU temperature is critical (${metrics.cpu_temp}°C).`, true);
+  else if (metrics.cpu_temp >= 85) warn(`CPU temperature is high (${metrics.cpu_temp}°C).`);
+  const gpuPower = metrics.gpu_power_w ?? metrics.power_watts;
+  if (gpuPower >= 350) warn(`GPU power draw is high (${Math.round(gpuPower)} W).`);
+  if (metrics.ram_pct >= 90) warn(`System memory usage is high (${Math.round(metrics.ram_pct)}%).`);
+
+  return { level, alerts };
+};
 
 // POST /api/gpu/register — host agent calls this on startup
 export const Gpuregister = async (req, res, next) => {
@@ -86,10 +143,17 @@ export const getMyGpu = async (req, res, next) => {
     next(error);
   }
 };
-// PATCH /api/gpu/heartbeat — agent calls every 30s to stay "online"
+// PATCH /api/gpu/heartbeat — agent sends health snapshots every 15s
 export const heartbeat = async (req, res, next) => {
   try {
     const { metrics, ipAddress, paused } = req.body;
+    if (
+      metrics !== undefined &&
+      (metrics === null || typeof metrics !== "object" || Array.isArray(metrics))
+    ) {
+      return res.status(400).json({ message: "Metrics must be an object" });
+    }
+
     const now = new Date();
     const fields = {
       lastSeen: { $literal: now },
@@ -102,7 +166,10 @@ export const heartbeat = async (req, res, next) => {
         ],
       },
     };
-    if (metrics) fields.metrics = { $literal: metrics };
+    const normalizedMetrics = metrics ? normalizeMetrics(metrics) : {};
+    if (Object.keys(normalizedMetrics).length > 0) {
+      fields.metrics = { $literal: { ...normalizedMetrics, updatedAt: now } };
+    }
     if (ipAddress !== undefined) {
       const sanitizedIp = normalizeIp(ipAddress);
       const ipProblem = describeDisallowedAgentIp(sanitizedIp);
@@ -118,6 +185,34 @@ export const heartbeat = async (req, res, next) => {
       { new: true }
     );
     if (!gpu) return res.status(404).json({ message: "GPU not found for this host" });
+
+    if (Object.keys(normalizedMetrics).length > 0) {
+      const safety = assessSafety(normalizedMetrics);
+      const gpuId = gpu._id.toString();
+      const safetySignature = safety.level === "ok"
+        ? "ok"
+        : `${safety.level}:${safety.alerts.map((message) => message.replace(/\s*\(.*\)$/, "")).join("|")}`;
+      const previousSignature = previousSafetyByGpu.get(gpuId);
+      previousSafetyByGpu.set(gpuId, safetySignature);
+
+      emitGpuTelemetry(
+        req.user.id,
+        {
+          gpuId,
+          ...normalizedMetrics,
+          gpu_temp: normalizedMetrics.gpu_temp ?? normalizedMetrics.temperature,
+          gpu_mem_used_mb: normalizedMetrics.gpu_mem_used_mb ?? normalizedMetrics.mem_used_mb,
+          gpu_mem_total_mb: normalizedMetrics.gpu_mem_total_mb ?? normalizedMetrics.mem_total_mb,
+          gpu_power_w: normalizedMetrics.gpu_power_w ?? normalizedMetrics.power_watts,
+          safety,
+          timestamp: now,
+        },
+        safety.level !== "ok" && safetySignature !== previousSignature
+          ? { gpuId, ...safety, timestamp: now }
+          : null
+      );
+    }
+
     res.json({ message: "Heartbeat received", lastSeen: gpu.lastSeen });
   } catch (error) {
     next(error);

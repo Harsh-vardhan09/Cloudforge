@@ -10,8 +10,7 @@ import { io } from 'socket.io-client';
 import api from '../services/api';
 
 /**
- * Interactive Node Graph visualizing Zero-Loss Job Migration:
- * Node A (Evicted) -> Object Storage (Checkpointing) -> Node B (Resumed)
+ * Interactive visualization of a job moving from one GPU to another.
  */
 const JobMigrationGraph = ({
   initialJobId = null,
@@ -19,11 +18,7 @@ const JobMigrationGraph = ({
   autoStart = false,
   onMigrationComplete = null,
 }) => {
-  // Migration phases:
-  // 0: Stable running on Node A
-  // 1: Node A Evicted (Host Reclaim triggered, SIGTERM, buffer flushed)
-  // 2: Object Storage Checkpointing (S3 sync, SHA-256 verified)
-  // 3: Node B Resumed (Peer worker claimed, weights hydrated, training continuing)
+  // Phase 0 is the starting state; phases 1-3 are the migration steps.
   const [phase, setPhase] = useState(0);
   const [isPlaying, setIsPlaying] = useState(autoStart);
   const [speed, setSpeed] = useState(1); // 0.5x, 1x, 2x
@@ -33,7 +28,7 @@ const JobMigrationGraph = ({
   const [activeJobId, setActiveJobId] = useState(initialJobId);
 
   // Live telemetry state
-  const [stepProgress, setStepProgress] = useState(450);
+  const stepProgress = 450;
   const totalSteps = 1000;
   const [nodeAData, setNodeAData] = useState({
     id: 'node-a-rtx4090',
@@ -354,13 +349,13 @@ const JobMigrationGraph = ({
             </div>
             <div>
               <h3 className="text-lg font-bold text-white flex items-center gap-2">
-                Live Migration Graph
+                Migration flow
                 <span className="text-[0.65rem] font-mono uppercase px-2.5 py-0.5 rounded-full bg-primary/10 text-primary border border-primary/20">
-                  Zero-Loss Checkpoint/Resume
+                  Read left to right
                 </span>
               </h3>
-              <p className="text-xs text-text-dim">
-                Real-time topological handover: Node A (Evicted) $\rightarrow$ Object Storage (Checkpointing) $\rightarrow$ Node B (Resumed)
+              <p className="text-xs text-text-dim mt-1">
+                Your job pauses on the current GPU, saves its progress, then continues on another GPU.
               </p>
             </div>
           </div>
@@ -385,7 +380,8 @@ const JobMigrationGraph = ({
           )}
 
           {/* Speed Selector */}
-          <div className="flex items-center bg-surface-muted border border-ink/15 rounded-xl p-0.5 text-xs">
+          <div className="flex items-center gap-1 bg-surface-muted border border-ink/15 rounded-xl p-0.5 text-xs" aria-label="Demo playback speed">
+            <span className="px-2 text-[0.65rem] text-text-dim">Speed</span>
             {[0.5, 1, 2].map((s) => (
               <button
                 key={s}
@@ -406,7 +402,7 @@ const JobMigrationGraph = ({
             title={isPlaying ? "Pause automated transition" : "Play automated transition"}
           >
             {isPlaying ? <Pause size={14} className="text-amber-400" /> : <Play size={14} className="text-primary" />}
-            <span>{isPlaying ? 'Pause' : 'Play Flow'}</span>
+            <span>            {isPlaying ? 'Pause' : 'Play steps'}</span>
           </button>
 
           {/* Reset */}
@@ -425,12 +421,19 @@ const JobMigrationGraph = ({
             className="flex items-center gap-2 px-4 py-2 rounded-xl bg-gradient-to-r from-amber-600 via-orange-500 to-primary text-white text-xs font-bold shadow-[0_0_20px_rgba(245,158,11,0.35)] hover:opacity-95 transition-all"
           >
             <Zap size={14} />
-            {isSimulatingBackend ? 'Triggering...' : 'Simulate Host Reclaim'}
+            {isSimulatingBackend ? 'Starting...' : 'Simulate GPU move'}
           </button>
         </div>
       </div>
 
-      {/* 3-Stage Lifecycle Stepper Navigation */}
+      {/* Migration steps */}
+      <div className="relative z-10 flex flex-col gap-1">
+        <h4 className="text-sm font-bold text-white">What happens to the job?</h4>
+        <p className="text-xs text-text-dim">
+          Select a step to preview it, or choose <span className="text-primary font-semibold">Play steps</span> to see the full sequence.
+          The starting state is before migration begins.
+        </p>
+      </div>
       <div className="relative z-10 grid grid-cols-1 md:grid-cols-3 gap-3">
         {/* Stage 1 Pill */}
         <button
@@ -450,10 +453,10 @@ const JobMigrationGraph = ({
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-              Node A: Evicted
+              Release current GPU
               {phase === 1 && <span className="w-2 h-2 rounded-full bg-amber-400 animate-ping" />}
             </span>
-            <span className="text-[0.7rem] text-text-dim truncate">Host reclaims GPU; SIGTERM dump</span>
+            <span className="text-[0.7rem] text-text-dim truncate">Pause the job and free the GPU</span>
           </div>
         </button>
 
@@ -475,10 +478,10 @@ const JobMigrationGraph = ({
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-              Object Storage: Checkpointed
+              Save job progress
               {phase === 2 && <span className="w-2 h-2 rounded-full bg-blue-400 animate-ping" />}
             </span>
-            <span className="text-[0.7rem] text-text-dim truncate">Durable S3 snapshot; 0% loss</span>
+            <span className="text-[0.7rem] text-text-dim truncate">Store a checkpoint of the current step</span>
           </div>
         </button>
 
@@ -498,16 +501,19 @@ const JobMigrationGraph = ({
           </div>
           <div className="flex flex-col min-w-0">
             <span className="text-xs font-bold text-white truncate flex items-center gap-1.5">
-              Node B: Resumed
+              Resume on another GPU
               {phase === 3 && <span className="w-2 h-2 rounded-full bg-primary animate-ping" />}
             </span>
-            <span className="text-[0.7rem] text-text-dim truncate">Peer worker hydrations; seamless run</span>
+            <span className="text-[0.7rem] text-text-dim truncate">Load the checkpoint and continue</span>
           </div>
         </button>
       </div>
 
-      {/* --- Visual Topological Graph Canvas --- */}
+      {/* --- Visual migration flow --- */}
       <div className="relative z-10 w-full min-h-[360px] lg:min-h-[420px] bg-surface-muted rounded-2xl border border-ink/15 p-4 sm:p-6 flex flex-col justify-between overflow-hidden">
+        <p className="relative z-10 text-[0.7rem] text-text-dim">
+          The highlighted step shows where the job is in the migration.
+        </p>
         {/* SVG Flow Pipeline Layer */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none z-0"
@@ -596,17 +602,17 @@ const JobMigrationGraph = ({
         <div className="relative z-10 flex flex-wrap items-center justify-between gap-3 text-xs">
           <div className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-white/[0.04] border border-ink/15 backdrop-blur-md">
             <span className="w-2 h-2 rounded-full bg-primary animate-pulse" />
-            <span className="text-text-dim">Current Workload:</span>
+            <span className="text-text-dim">Example job:</span>
             <span className="font-mono text-white font-semibold">PyTorch Llama 3 8B Fine-Tuning</span>
           </div>
 
           <div className="flex items-center gap-3 font-mono text-[0.72rem]">
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-muted border border-ink/15">
-              <span className="text-text-dim">Checkpoint Step:</span>
+              <span className="text-text-dim">Saved job step:</span>
               <span className="text-primary font-bold">{stepProgress} / {totalSteps}</span>
             </div>
             <div className="flex items-center gap-1.5 px-3 py-1 rounded-lg bg-surface-muted border border-ink/15">
-              <span className="text-text-dim">Zero Data Loss:</span>
+              <span className="text-text-dim">Progress preserved:</span>
               <span className="text-success font-bold">100.0% Preserved</span>
             </div>
           </div>
@@ -638,8 +644,8 @@ const JobMigrationGraph = ({
                   <Server size={22} className={phase === 0 ? "animate-pulse" : ""} />
                 </div>
                 <div>
-                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Source Worker</span>
-                  <h4 className="text-sm font-bold text-white">Node A (Host)</h4>
+                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Where the job starts</span>
+                  <h4 className="text-sm font-bold text-white">Current GPU</h4>
                 </div>
               </div>
 
@@ -659,24 +665,24 @@ const JobMigrationGraph = ({
             <div className="bg-surface-muted rounded-xl p-3 border border-ink/10 flex flex-col gap-2 font-mono text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-text-dim flex items-center gap-1.5">
-                  <Cpu size={13} className="text-primary" /> Model:
+                    <Cpu size={13} className="text-primary" /> GPU:
                 </span>
                 <span className="text-white font-semibold">{nodeAData.model}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">VRAM Usage:</span>
+                <span className="text-text-dim">GPU memory:</span>
                 <span className={phase === 0 ? "text-primary font-bold" : "text-text-dim font-bold"}>
                   {phase === 0 ? `${nodeAData.vramUsed} GB` : '0.2 GB (Freed)'} / {nodeAData.vramTotal} GB
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">Core Temp:</span>
+                <span className="text-text-dim">Temperature:</span>
                 <span className={phase === 0 ? "text-amber-400" : "text-text-dim"}>
                   {phase === 0 ? `${nodeAData.temp}°C` : '38°C (Cooling)'}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">Compute Load:</span>
+                <span className="text-text-dim">GPU activity:</span>
                 <span className={phase === 0 ? "text-success font-bold" : "text-text-dim font-bold"}>
                   {phase === 0 ? '98% Active' : '0% (Idle)'}
                 </span>
@@ -687,7 +693,7 @@ const JobMigrationGraph = ({
             <div className="pt-2 border-t border-ink/10 flex items-center justify-between text-[0.72rem]">
               <span className="text-text-dim">Role:</span>
               <span className={phase >= 1 ? "text-amber-400 font-semibold" : "text-success font-semibold"}>
-                {phase >= 1 ? "Host Reclaimed Hardware" : "Workload Assigned"}
+                {phase >= 1 ? "GPU released" : "Running this job"}
               </span>
             </div>
           </Motion.div>
@@ -718,8 +724,8 @@ const JobMigrationGraph = ({
                   <Database size={22} className={phase === 2 ? "animate-bounce" : ""} />
                 </div>
                 <div>
-                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Central Vault</span>
-                  <h4 className="text-sm font-bold text-white">Object Storage</h4>
+                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Saved job progress</span>
+                  <h4 className="text-sm font-bold text-white">Checkpoint</h4>
                 </div>
               </div>
 
@@ -741,22 +747,22 @@ const JobMigrationGraph = ({
             <div className="bg-surface-muted rounded-xl p-3 border border-ink/10 flex flex-col gap-2 font-mono text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-text-dim flex items-center gap-1.5">
-                  <HardDrive size={13} className="text-blue-400" /> S3 Key:
+                  <HardDrive size={13} className="text-blue-400" /> Checkpoint file:
                 </span>
                 <span className="text-blue-300 font-semibold truncate max-w-[140px]" title={storageData.objectKey}>
                   {storageData.objectKey}
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">Snapshot Size:</span>
-                <span className="text-white font-bold">{storageData.sizeMB} MB (Tensors)</span>
+                <span className="text-text-dim">Saved size:</span>
+                <span className="text-white font-bold">{storageData.sizeMB} MB</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">Transfer Throughput:</span>
+                <span className="text-text-dim">Upload speed:</span>
                 <span className="text-success font-bold">{storageData.uploadSpeed}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">State Integrity:</span>
+                <span className="text-text-dim">File check:</span>
                 <span className="text-blue-400 font-bold flex items-center gap-1">
                   <ShieldCheck size={13} /> SHA-256 OK
                 </span>
@@ -767,7 +773,7 @@ const JobMigrationGraph = ({
             <div className="pt-2 border-t border-ink/10 flex items-center justify-between text-[0.72rem]">
               <span className="text-text-dim">Preserved State:</span>
               <span className="text-primary font-mono font-bold">
-                Step {stepProgress} / {totalSteps} (0 loss)
+              Progress saved: Step {stepProgress} of {totalSteps}
               </span>
             </div>
           </Motion.div>
@@ -796,8 +802,8 @@ const JobMigrationGraph = ({
                   <Server size={22} className={phase === 3 ? "animate-pulse" : ""} />
                 </div>
                 <div>
-                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Target Worker</span>
-                  <h4 className="text-sm font-bold text-white">Node B (Peer)</h4>
+                  <span className="text-[0.65rem] font-mono uppercase tracking-wider text-text-dim">Where the job continues</span>
+                  <h4 className="text-sm font-bold text-white">New GPU</h4>
                 </div>
               </div>
 
@@ -817,18 +823,18 @@ const JobMigrationGraph = ({
             <div className="bg-surface-muted rounded-xl p-3 border border-ink/10 flex flex-col gap-2 font-mono text-xs">
               <div className="flex justify-between items-center">
                 <span className="text-text-dim flex items-center gap-1.5">
-                  <Cpu size={13} className="text-primary" /> Model:
+                  <Cpu size={13} className="text-primary" /> GPU:
                 </span>
                 <span className="text-white font-semibold">{nodeBData.model}</span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">VRAM Usage:</span>
+                <span className="text-text-dim">GPU memory:</span>
                 <span className={phase === 3 ? "text-primary font-bold" : "text-text-dim font-bold"}>
                   {phase === 3 ? `${nodeBData.vramUsed} GB` : '0 GB'} / {nodeBData.vramTotal} GB
                 </span>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-text-dim">Hydration Time:</span>
+                <span className="text-text-dim">Time to load:</span>
                 <span className={phase === 3 ? "text-primary font-bold" : "text-text-dim"}>
                   {phase === 3 ? '1.4s (Fast)' : '--'}
                 </span>
@@ -856,33 +862,37 @@ const JobMigrationGraph = ({
           <div className="flex items-center gap-2">
             <Sparkles size={16} className="text-primary shrink-0" />
             <span>
-              {phase === 0 && "Workload is currently running on Node A. Click 'Simulate Host Reclaim' to see the migration in action."}
-              {phase === 1 && "Stage 1: Host requested reclaim. Node A dumps in-memory state and releases GPU slot. Checkpoint upload begins."}
-              {phase === 2 && "Stage 2: Checkpoint safely stored in Object Storage. Scheduler matches an available peer worker (Node B)."}
-              {phase === 3 && "Stage 3: Node B hydrates state from Object Storage. Workload resumes at the exact step with ZERO compute lost!"}
+              {phase === 0 && "Before migration: the job is running on the current GPU. Run the demo to see how it moves."}
+              {phase === 1 && "Step 1 of 3: the job pauses and releases the current GPU. Its progress is prepared for saving."}
+              {phase === 2 && "Step 2 of 3: the checkpoint is saved. The scheduler looks for another available GPU."}
+              {phase === 3 && "Step 3 of 3: another GPU loads the checkpoint and continues the job from the saved step."}
             </span>
           </div>
           <span className="font-mono text-[0.7rem] text-primary whitespace-nowrap hidden sm:inline">
-            Phase {phase}/3
+            {phase === 0 ? 'Before migration' : `Step ${phase} of 3`}
           </span>
         </div>
       </div>
 
-      {/* --- Detail Inspector & Live Terminal Drawer --- */}
-      <div className="relative z-10 grid grid-cols-1 lg:grid-cols-2 gap-4">
+      {/* Optional technical detail for users who want to inspect the demo. */}
+      <details className="relative z-10 group">
+        <summary className="cursor-pointer list-none rounded-xl border border-ink/10 bg-white/[0.02] px-4 py-3 text-sm font-semibold text-white marker:hidden hover:bg-white/[0.04]">
+          More details <span className="ml-1 text-xs font-normal text-text-dim">Technical information and event log</span>
+        </summary>
+        <div className="mt-4 grid grid-cols-1 lg:grid-cols-2 gap-4">
         {/* Node Inspector Card */}
         <div className="p-4 rounded-xl bg-white/[0.02] border border-ink/10 flex flex-col gap-3">
           <div className="flex items-center justify-between border-b border-ink/10 pb-2.5">
             <h4 className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
               <Layers size={14} className="text-primary" />
-              Detailed Node Inspector: <span className="text-primary">{selectedNode.toUpperCase()}</span>
+              Selected item details: <span className="text-primary">{selectedNode === 'nodeA' ? 'Current GPU' : selectedNode === 'storage' ? 'Checkpoint' : 'New GPU'}</span>
             </h4>
-            <span className="text-[0.65rem] font-mono text-text-dim">Click any node above to inspect</span>
+            <span className="text-[0.65rem] text-text-dim">Select a card above to change details</span>
           </div>
 
           {selectedNode === 'nodeA' && (
             <div className="flex flex-col gap-2.5 text-xs text-text-dim">
-              <p className="text-white font-medium">Node A (Source Host - RTX 4090)</p>
+              <p className="text-white font-medium">Current GPU (source)</p>
               <div className="bg-surface-muted p-3 rounded-lg border border-ink/10 font-mono text-[0.75rem] flex flex-col gap-1.5">
                 <div>Container PID: <span className="text-white">docker://d8f28a9b (llama-finetune)</span></div>
                 <div>Isolation: <span className="text-success">Rootless Docker + GPU Pass-through</span></div>
@@ -894,7 +904,7 @@ const JobMigrationGraph = ({
 
           {selectedNode === 'storage' && (
             <div className="flex flex-col gap-2.5 text-xs text-text-dim">
-              <p className="text-white font-medium">Object Storage (Checkpoint Vault)</p>
+              <p className="text-white font-medium">Checkpoint (saved progress)</p>
               <div className="bg-surface-muted p-3 rounded-lg border border-ink/10 font-mono text-[0.75rem] flex flex-col gap-1.5">
                 <div>Bucket Path: <span className="text-blue-300">s3://computegrid-checkpoints/job-482a/</span></div>
                 <div>Payload Archive: <span className="text-white">weights.safetensors, optimizer.pt, rng_state.pth</span></div>
@@ -906,7 +916,7 @@ const JobMigrationGraph = ({
 
           {selectedNode === 'nodeB' && (
             <div className="flex flex-col gap-2.5 text-xs text-text-dim">
-              <p className="text-white font-medium">Node B (Secondary Host - A100-SXM4)</p>
+              <p className="text-white font-medium">New GPU (target)</p>
               <div className="bg-surface-muted p-3 rounded-lg border border-ink/10 font-mono text-[0.75rem] flex flex-col gap-1.5">
                 <div>Scheduler Match: <span className="text-primary">Auto-matched within 850ms</span></div>
                 <div>Hydration Latency: <span className="text-white">1.4s checkpoint download + tensor load</span></div>
@@ -922,9 +932,9 @@ const JobMigrationGraph = ({
           <div className="flex items-center justify-between border-b border-ink/10 pb-2">
             <span className="text-xs font-bold text-white flex items-center gap-2">
               <Terminal size={14} className="text-primary" />
-              Live Telemetry Stream
+              Migration event log
             </span>
-            <span className="text-[0.65rem] text-text-dim">Socket.IO Active</span>
+            <span className="text-[0.65rem] text-text-dim">Technical events</span>
           </div>
 
           <div className="max-h-40 overflow-y-auto flex flex-col gap-1 pr-1 text-[0.72rem] leading-relaxed">
@@ -942,7 +952,8 @@ const JobMigrationGraph = ({
             ))}
           </div>
         </div>
-      </div>
+        </div>
+      </details>
     </div>
   );
 };

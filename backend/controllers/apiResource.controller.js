@@ -65,7 +65,7 @@ export const getRentedResources = async (req, res, next) => {
 export const proxyRequest = async (req, res, next) => {
   try {
     const { resourceId } = req.params;
-    const body = req.body;
+    const body = req.body || {};
 
     const resource = await ApiResource.findById(resourceId);
     if (!resource) return res.status(404).json({ message: "Resource not found" });
@@ -77,10 +77,27 @@ export const proxyRequest = async (req, res, next) => {
     let targetUrl = '';
     let headers = { 'Content-Type': 'application/json' };
 
-    if (!['openai', 'anthropic'].includes(resource.provider)) {
+    if (!['openai', 'anthropic', 'google'].includes(resource.provider)) {
       return res.status(501).json({
         message: `Proxying is not implemented for provider '${resource.provider}'`,
       });
+    }
+    if (
+      resource.provider === 'google' &&
+      (!Array.isArray(body.messages) ||
+        body.messages.length === 0 ||
+        body.messages.length > 40 ||
+        body.messages.some(
+          (message) =>
+            !message ||
+            !['user', 'assistant'].includes(message.role) ||
+            typeof message.content !== 'string' ||
+            !message.content.trim() ||
+            message.content.length > 12000
+        ) ||
+        body.messages.reduce((total, message) => total + message.content.length, 0) > 40000)
+    ) {
+      return res.status(400).json({ message: 'Provide up to 40 valid chat messages (40,000 characters total)' });
     }
 
     switch (resource.provider) {
@@ -93,13 +110,23 @@ export const proxyRequest = async (req, res, next) => {
         headers['x-api-key'] = realApiKey;
         headers['anthropic-version'] = '2023-06-01';
         break;
+      case 'google':
+        targetUrl = 'https://generativelanguage.googleapis.com/v1beta/models/gemini-flash-lite-latest:generateContent';
+        headers['x-goog-api-key'] = realApiKey;
+        body.contents = (body.messages || []).map(({ role, content }) => ({
+          role: role === 'assistant' ? 'model' : 'user',
+          parts: [{ text: content }],
+        }));
+        delete body.messages;
+        delete body.model;
+        break;
     }
 
     logger.info(`Proxying request for user ${req.user.id} to ${resource.provider} via resource ${resourceId}`);
     const response = await axios.post(targetUrl, body, { headers });
     
     // --- Post-Response Usage Billing ---
-    const usage = response.data.usage;
+    const usage = response.data.usage || response.data.usageMetadata;
     if (usage) {
       let tokens = { input: 0, output: 0, total: 0 };
       
@@ -111,6 +138,10 @@ export const proxyRequest = async (req, res, next) => {
         tokens.input = usage.input_tokens;
         tokens.output = usage.output_tokens;
         tokens.total = usage.input_tokens + usage.output_tokens;
+      } else if (resource.provider === 'google') {
+        tokens.input = usage.promptTokenCount || 0;
+        tokens.output = usage.candidatesTokenCount || 0;
+        tokens.total = usage.totalTokenCount || tokens.input + tokens.output;
       }
 
       const cost = (tokens.total / 1000000) * (resource.tokenRate || 1.0);

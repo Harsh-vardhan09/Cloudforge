@@ -9,6 +9,7 @@ import {
   pushLog,
   completeJob,
   cancelJob,
+  retryJob,
   getStats,
   reclaimJob,
   saveCheckpoint,
@@ -48,5 +49,6 @@ jobsRouter.delete("/:id", authentication, cancelJob);       // Cancel queued job
 jobsRouter.post("/:id/logs", authentication, pushLog);       // Agent pushes log lines
 jobsRouter.post("/:id/checkpoint", authentication, saveCheckpoint); // Agent confirms a checkpoint upload
 jobsRouter.post("/:id/complete", authentication, completeJob); // Agent marks job done
+jobsRouter.post("/:id/retry", authentication, retryJob);       // Re-run a completed or failed job
 
 export default jobsRouter;

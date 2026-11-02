@@ -133,7 +133,7 @@ export const postJob = async (req, res, next) => {
       finalCommand = `bash /workspace/${scriptName}`;
     } else if (lowerName.endsWith(".ipynb")) {
       // Execute Jupyter Notebook with output preservation and pip fallback
-      finalCommand = `(jupyter nbconvert --to notebook --execute /workspace/${scriptName} --output /workspace/output_${scriptName} || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${scriptName}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output_${scriptName}'); print('=== Notebook executed successfully ===')")`;
+      finalCommand = `(mkdir -p /workspace/output && jupyter nbconvert --to notebook --execute /workspace/${scriptName} --output-dir /workspace/output || python -c "import subprocess, sys; subprocess.run([sys.executable, '-m', 'pip', 'install', '-q', 'nbconvert', 'ipykernel']); import nbformat; from nbconvert.preprocessors import ExecutePreprocessor; ep = ExecutePreprocessor(timeout=1200); nb = nbformat.read('/workspace/${scriptName}', as_version=4); ep.preprocess(nb); nbformat.write(nb, '/workspace/output/output_${scriptName}'); print('=== Notebook executed successfully ===')")`;
     } else {
       finalCommand = `python /workspace/${scriptName}`;
     }
@@ -995,6 +995,48 @@ export const cancelJob = async (req, res, next) => {
     res.json({ message: "Job cancelled" });
   } catch (err) {
     next(err);
+  }
+};
+
+// POST /api/jobs/:id/retry — submit a fresh run using this user's saved inputs/config.
+export const retryJob = async (req, res, next) => {
+  try {
+    const source = await Job.findOne({
+      _id: req.params.id,
+      user: req.user.id,
+      status: { $in: ["completed", "failed"] },
+    });
+    if (!source) {
+      return res.status(404).json({ message: "Only your completed or failed jobs can be run again" });
+    }
+
+    const user = await User.findById(req.user.id).select("creditBalance");
+    if (!user || user.creditBalance <= 0) {
+      return res.status(402).json({ message: "Insufficient credits to submit a job. Please recharge your balance." });
+    }
+
+    const job = await Job.create({
+      user: req.user.id,
+      preferredGpu: source.preferredGpu || undefined,
+      dockerImage: source.dockerImage,
+      command: source.command,
+      vramRequired: source.vramRequired,
+      env: source.env,
+      scriptName: source.scriptName,
+      inputObjectKey: source.inputObjectKey,
+      datasetName: source.datasetName,
+      datasetObjectKey: source.datasetObjectKey,
+      status: "queued",
+      logs: [
+        `[retry] New run created from job ${source._id}`,
+        "[queue] Job created in QUEUED status",
+      ],
+    });
+
+    logger.info(`Job ${job._id} re-submitted from ${source._id} by user ${req.user.id}`);
+    return res.status(202).json({ message: "Job queued for another run", job });
+  } catch (error) {
+    next(error);
   }
 };
 

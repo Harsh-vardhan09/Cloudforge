@@ -10,6 +10,7 @@ import { motion as Motion, AnimatePresence } from 'framer-motion';
 import {
   Thermometer, Cpu, Zap, Activity, MemoryStick, HardDrive,
   Wifi, AlertTriangle, ShieldCheck, ShieldAlert, Clock, RefreshCw,
+  X,
 } from 'lucide-react';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
@@ -36,6 +37,32 @@ const LEVEL_COLOR = {
   warning:  { ring: '#f59e0b', bg: 'rgba(245,158,11,0.12)', text: '#fbbf24' },
   critical: { ring: '#ef4444', bg: 'rgba(239,68,68,0.12)',  text: '#f87171' },
 };
+
+function getSafety(snapshot) {
+  const alerts = [];
+  let level = 'ok';
+  const warn = (message, critical = false) => {
+    alerts.push(message);
+    if (critical) level = 'critical';
+    else if (level === 'ok') level = 'warning';
+  };
+  const gpuTemp = snapshot?.gpu_temp ?? snapshot?.temperature;
+  const gpuPower = snapshot?.gpu_power_w ?? snapshot?.power_watts;
+  if (gpuTemp >= 92) warn(`GPU temperature is critical (${gpuTemp}°C).`, true);
+  else if (gpuTemp >= 80) warn(`GPU temperature is high (${gpuTemp}°C).`);
+  if (snapshot?.cpu_temp >= 95) warn(`CPU temperature is critical (${snapshot.cpu_temp}°C).`, true);
+  else if (snapshot?.cpu_temp >= 85) warn(`CPU temperature is high (${snapshot.cpu_temp}°C).`);
+  if (gpuPower >= 350) warn(`GPU power draw is high (${Math.round(gpuPower)} W).`);
+  if (snapshot?.ram_pct >= 90) warn(`System memory usage is high (${Math.round(snapshot.ram_pct)}%).`);
+  return { level, alerts };
+}
+
+function getAlertKey(alert) {
+  const alertKey = (alert.alerts ?? [])
+    .map(message => message.replace(/\s*\(.*\)$/, ''))
+    .join('|');
+  return `${alert.level}-${alertKey}`;
+}
 
 function GaugeBar({ label, icon: Icon, value, max = 100, unit = '%', colorFn }) {
   const pct   = Math.min(100, Math.max(0, ((value ?? 0) / max) * 100));
@@ -84,15 +111,18 @@ function StatPill({ icon: Icon, label, value }) {
 
 // ─── main component ──────────────────────────────────────────────────────────
 
-export default function TelemetryPanel({ socket, activeJobId }) {
-  const [snapshot, setSnapshot]   = useState(null);
-  const [alerts,   setAlerts]     = useState([]);
-  const [lastAt,   setLastAt]     = useState(null);
+export default function TelemetryPanel({ socket, initialSnapshot }) {
+  const [snapshot, setSnapshot]   = useState(initialSnapshot ?? null);
+  const [alerts, setAlerts] = useState(() => {
+    const safety = initialSnapshot?.safety ?? getSafety(initialSnapshot);
+    return safety.level === 'ok' ? [] : [{ ...safety, key: getAlertKey(safety) }];
+  });
+  const [now, setNow] = useState(0);
   const alertTimers = useRef({});
 
   // Dismiss an alert after 30s
   const addAlert = useCallback((alert) => {
-    const key = `${alert.level}-${(alert.alerts ?? []).join('|')}`;
+    const key = getAlertKey(alert);
     setAlerts(prev => {
       if (prev.find(a => a.key === key)) return prev;
       return [{ ...alert, key }, ...prev].slice(0, 5);
@@ -107,10 +137,9 @@ export default function TelemetryPanel({ socket, activeJobId }) {
     if (!socket) return;
 
     const onTelemetry = (data) => {
-      // Only show telemetry for the active job (or any if no job selected)
-      if (activeJobId && data.jobId && data.jobId !== activeJobId) return;
-      setSnapshot(data);
-      setLastAt(new Date());
+      const safety = data.safety ?? getSafety(data);
+      setSnapshot({ ...data, safety });
+      if (safety.level !== 'ok') addAlert(safety);
     };
 
     const onSafetyAlert = (data) => {
@@ -123,22 +152,35 @@ export default function TelemetryPanel({ socket, activeJobId }) {
       socket.off('gpu:telemetry',    onTelemetry);
       socket.off('gpu:safety_alert', onSafetyAlert);
     };
-  }, [socket, activeJobId, addAlert]);
+  }, [socket, addAlert]);
 
-  const safety = snapshot?.safety ?? { level: 'ok', alerts: [] };
+  useEffect(() => () => {
+    Object.values(alertTimers.current).forEach(clearTimeout);
+  }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => setNow(Date.now()), 5000);
+    return () => clearInterval(interval);
+  }, []);
+
+  const safety = snapshot?.safety ?? getSafety(snapshot);
   const colors = LEVEL_COLOR[safety.level] ?? LEVEL_COLOR.ok;
   const hasData = snapshot != null;
+  const snapshotTime = snapshot?.timestamp ?? snapshot?.updatedAt;
+  const lastAt = snapshotTime ? new Date(snapshotTime) : null;
 
-  const gpuTemp    = snapshot?.gpu_temp;
+  const gpuTemp    = snapshot?.gpu_temp ?? snapshot?.temperature;
   const cpuTemp    = snapshot?.cpu_temp;
   const gpuUtil    = snapshot?.gpu_util;
-  const gpuMemPct  = snapshot?.gpu_mem_total_mb
-    ? ((snapshot.gpu_mem_used_mb ?? 0) / snapshot.gpu_mem_total_mb) * 100 : null;
-  const gpuPower   = snapshot?.gpu_power_w;
+  const gpuMemTotal = snapshot?.gpu_mem_total_mb ?? snapshot?.mem_total_mb;
+  const gpuMemUsed = snapshot?.gpu_mem_used_mb ?? snapshot?.mem_used_mb;
+  const gpuMemPct  = gpuMemTotal ? ((gpuMemUsed ?? 0) / gpuMemTotal) * 100 : null;
+  const gpuPower   = snapshot?.gpu_power_w ?? snapshot?.power_watts;
   const gpuFan     = snapshot?.gpu_fan_pct;
   const cpuPct     = snapshot?.cpu_pct;
   const ramPct     = snapshot?.ram_pct;
   const uptime     = snapshot?.uptime_seconds;
+  const isStale = lastAt != null && now - lastAt.getTime() > 45_000;
 
   return (
     <div style={{
@@ -179,13 +221,13 @@ export default function TelemetryPanel({ socket, activeJobId }) {
           {lastAt && (
             <span style={{ fontSize: 10, color: '#6b7280', display: 'flex', alignItems: 'center', gap: 4 }}>
               <RefreshCw size={10} />
-              {lastAt.toLocaleTimeString()}
+              {isStale ? 'Telemetry is stale' : `Updated ${lastAt.toLocaleTimeString()}`}
             </span>
           )}
           <div style={{
             width: 7, height: 7, borderRadius: '50%',
-            background: hasData ? colors.ring : '#374151',
-            boxShadow: hasData ? `0 0 6px ${colors.ring}` : 'none',
+            background: hasData && !isStale ? colors.ring : '#374151',
+            boxShadow: hasData && !isStale ? `0 0 6px ${colors.ring}` : 'none',
             animation: hasData && safety.level !== 'ok' ? 'pulse 1.5s infinite' : 'none',
           }} />
         </div>
@@ -193,6 +235,52 @@ export default function TelemetryPanel({ socket, activeJobId }) {
 
       {/* Body */}
       <div style={{ padding: '16px 18px' }}>
+        <div aria-live="polite" className="fixed right-4 top-4 z-[1100] flex w-[min(24rem,calc(100vw-2rem))] flex-col gap-2">
+          <AnimatePresence>
+            {alerts.map(alert => (
+              <Motion.div
+                key={alert.key}
+                initial={{ opacity: 0, y: -8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                style={{
+                  padding: '12px 14px',
+                  borderRadius: 10,
+                  background: alert.level === 'critical' ? '#3b1519' : '#382b12',
+                  border: `1px solid ${alert.level === 'critical' ? '#ef444488' : '#f59e0b88'}`,
+                  display: 'flex', alignItems: 'flex-start', gap: 10,
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.35)',
+                }}
+              >
+                <AlertTriangle size={15} style={{
+                  color: alert.level === 'critical' ? '#f87171' : '#fbbf24',
+                  flexShrink: 0, marginTop: 1,
+                }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{
+                    fontSize: 11,
+                    fontWeight: 700,
+                    color: alert.level === 'critical' ? '#f87171' : '#fbbf24',
+                    marginBottom: 3,
+                  }}>
+                    Hardware {alert.level}
+                  </div>
+                  {(alert.alerts ?? []).map((message, index) => (
+                    <div key={index} style={{ fontSize: 12, color: '#e5e7eb', lineHeight: 1.5 }}>{message}</div>
+                  ))}
+                </div>
+                <button
+                  type="button"
+                  aria-label="Dismiss hardware alert"
+                  onClick={() => setAlerts(prev => prev.filter(item => item.key !== alert.key))}
+                  style={{ color: '#9ca3af', padding: 2 }}
+                >
+                  <X size={14} />
+                </button>
+              </Motion.div>
+            ))}
+          </AnimatePresence>
+        </div>
         {!hasData ? (
           <div style={{
             textAlign: 'center', padding: '32px 0',
@@ -201,41 +289,11 @@ export default function TelemetryPanel({ socket, activeJobId }) {
           }}>
             <Activity size={28} style={{ opacity: 0.4 }} />
             <span>Waiting for telemetry…<br />
-              <span style={{ fontSize: 11 }}>Streams automatically when a job is running</span>
+              <span style={{ fontSize: 11 }}>Start the host agent to send updates every 15 seconds</span>
             </span>
           </div>
         ) : (
           <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-
-            {/* Safety alerts */}
-            <AnimatePresence>
-              {alerts.map(alert => (
-                <Motion.div
-                  key={alert.key}
-                  initial={{ opacity: 0, y: -8 }}
-                  animate={{ opacity: 1, y: 0 }}
-                  exit={{ opacity: 0, y: -8 }}
-                  style={{
-                    padding: '10px 14px',
-                    borderRadius: 10,
-                    background: alert.level === 'critical'
-                      ? 'rgba(239,68,68,0.12)' : 'rgba(245,158,11,0.10)',
-                    border: `1px solid ${alert.level === 'critical' ? '#ef444444' : '#f59e0b44'}`,
-                    display: 'flex', alignItems: 'flex-start', gap: 10,
-                  }}
-                >
-                  <AlertTriangle size={14} style={{
-                    color: alert.level === 'critical' ? '#f87171' : '#fbbf24',
-                    flexShrink: 0, marginTop: 1,
-                  }} />
-                  <div>
-                    {(alert.alerts ?? []).map((msg, i) => (
-                      <div key={i} style={{ fontSize: 12, color: '#e5e7eb', lineHeight: 1.5 }}>{msg}</div>
-                    ))}
-                  </div>
-                </Motion.div>
-              ))}
-            </AnimatePresence>
 
             {/* GPU Section */}
             <div>
@@ -279,6 +337,10 @@ export default function TelemetryPanel({ socket, activeJobId }) {
                 )}
                 <GaugeBar label="RAM Usage" icon={HardDrive} value={ramPct}
                   max={100} unit="%" />
+                {snapshot?.disk_used_pct != null && (
+                  <GaugeBar label="Disk Usage" icon={HardDrive} value={snapshot.disk_used_pct}
+                    max={100} unit="%" />
+                )}
               </div>
             </div>
 
@@ -286,19 +348,29 @@ export default function TelemetryPanel({ socket, activeJobId }) {
             <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginTop: 4 }}>
               <StatPill icon={Clock} label="Uptime" value={fmtUptime(uptime)} />
               <StatPill icon={MemoryStick} label="VRAM Used"
-                value={snapshot?.gpu_mem_used_mb
-                  ? `${Math.round(snapshot.gpu_mem_used_mb / 1024 * 10) / 10} / ${Math.round(snapshot.gpu_mem_total_mb / 1024 * 10) / 10} GB`
+                value={gpuMemUsed != null && gpuMemTotal != null
+                  ? `${Math.round(gpuMemUsed / 1024 * 10) / 10} / ${Math.round(gpuMemTotal / 1024 * 10) / 10} GB`
                   : null} />
               <StatPill icon={HardDrive} label="RAM Used"
                 value={snapshot?.ram_used_mb
                   ? `${Math.round(snapshot.ram_used_mb / 1024)} / ${Math.round(snapshot.ram_total_mb / 1024)} GB`
                   : null} />
-              <StatPill icon={Wifi} label="Net ↑ / ↓"
+              <StatPill icon={Wifi} label="Network sent / received"
                 value={snapshot?.net_sent_mb != null
                   ? `${safeNum(snapshot.net_sent_mb, 0)} / ${safeNum(snapshot.net_recv_mb, 0)} MB`
                   : null} />
+              <StatPill icon={HardDrive} label="Disk Used"
+                value={snapshot?.disk_used_gb != null && snapshot?.disk_total_gb != null
+                  ? `${safeNum(snapshot.disk_used_gb, 1)} / ${safeNum(snapshot.disk_total_gb, 1)} GB`
+                  : null} />
             </div>
           </div>
+        )}
+        {hasData && (
+          <p style={{ marginTop: 14, fontSize: 10, lineHeight: 1.5, color: '#6b7280' }}>
+            Updates every 15 seconds while the host agent is online. Alerts notify you but do not stop a job.
+            NVIDIA readings require NVIDIA drivers; CPU temperature depends on an available system sensor.
+          </p>
         )}
       </div>
 
